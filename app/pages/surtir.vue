@@ -35,12 +35,14 @@
                 <div v-for="req in requests" :key="req.id" class="col-12">
                     <div class="card border-0 shadow-sm p-3">
                         <div class="d-flex justify-content-between align-items-start">
-                            <div>
-                                <div class="d-flex align-items-center gap-2">
+                            <div class="flex-grow-1">
+                                <div class="d-flex align-items-center gap-2 mb-2">
                                     <strong class="text-teal">{{ req.item }}</strong>
                                     <span v-if="req.category_obj" class="badge bg-light text-muted border">{{ req.category_obj.name }}</span>
                                 </div>
-                                <div class="small text-muted mt-1">
+                                
+                                <!-- Quantity Progress -->
+                                <div class="small text-muted mb-2">
                                     <div class="d-flex align-items-center gap-2">
                                         <span>Faltan: <strong class="text-danger">{{ req.remaining_quantity }}</strong> / {{ req.quantity }}</span>
                                         <div class="progress" style="height: 6px; width: 100px;">
@@ -49,11 +51,34 @@
                                         </div>
                                     </div>
                                 </div>
-                                <div v-if="req.comments" class="small text-muted mt-1 fst-italic">
+
+                                <!-- Cost Information -->
+                                <div v-if="req.estimated_unit_cost && req.estimated_unit_cost > 0" class="mb-2">
+                                    <div class="d-flex gap-3 small">
+                                        <div class="text-muted">
+                                            <i class="fas fa-tag me-1"></i>
+                                            Costo unitario: <strong class="text-dark">${{ req.estimated_unit_cost.toFixed(2) }}</strong>
+                                        </div>
+                                        <div class="text-success fw-bold">
+                                            <i class="fas fa-calculator me-1"></i>
+                                            Total estimado: ${{ (req.remaining_quantity * req.estimated_unit_cost).toFixed(2) }}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Suggested Provider -->
+                                <div v-if="req.suggested_provider" class="small text-muted mb-2">
+                                    <i class="fas fa-store me-1"></i>
+                                    <strong>Proveedor sugerido:</strong> {{ req.suggested_provider }}
+                                </div>
+
+                                <!-- Comments -->
+                                <div v-if="req.comments" class="small text-muted fst-italic border-start border-2 border-teal ps-2">
                                     "{{ req.comments }}"
                                 </div>
                             </div>
-                            <div class="text-end">
+                            
+                            <div class="text-end ms-3">
                                 <button class="btn btn-teal btn-sm rounded-pill px-3 shadow-sm" @click="openSurtirModal(req)">
                                     <i class="fas fa-box-open me-1"></i> Yo lo surto
                                 </button>
