@@ -1,9 +1,18 @@
 <template>
   <div>
-    <h6 class="text-teal fw-bold mb-2">LISTA DE NECESIDADES</h6>
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <h6 class="text-teal fw-bold mb-0">LISTA DE NECESIDADES</h6>
+        <!-- DONATION BUTTON FOR SPONSORS -->
+        <button v-if="isPatrocinador || isAdmin" 
+            class="btn btn-warning rounded-pill px-3 fw-bold shadow-sm animate-pulse"
+            @click="openDonationModal">
+            <i class="fas fa-hand-holding-usd me-1"></i> Donar Dinero
+        </button>
+    </div>
+
     <div class="alert alert-light small border-start border-4 border-teal text-muted shadow-sm mb-4">
         <i class="fas fa-hand-holding-heart me-1"></i> 
-        Ayuda surtiendo estos insumos. Puedes comprometerte a entregar total o parcialmente lo requerido en nuestros centros de acopio.
+        Ayuda surtiendo estos insumos o realizando una aportación económica directa.
     </div>
 
     <!-- TABS -->
@@ -186,6 +195,55 @@
         </div>
     </div>
 
+    <!-- MODAL DONACIÓN -->
+    <div v-if="showDonationModal" class="modal d-block" style="background: rgba(0,0,0,0.5); z-index: 1070;">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow rounded-4">
+                <div class="modal-header border-0 bg-teal text-white rounded-top-4">
+                    <h5 class="fw-bold mb-0"><i class="fas fa-hand-holding-usd me-2"></i>Datos para Donativos</h5>
+                    <button type="button" class="btn-close btn-close-white" @click="showDonationModal = false"></button>
+                </div>
+                <div class="modal-body p-4 bg-light">
+                    <p class="text-center text-muted small mb-4">
+                        Gracias por tu generosidad. Puedes realizar tu aportación a cualquiera de las siguientes cuentas:
+                    </p>
+
+                    <div v-if="loadingBanks" class="text-center py-4">
+                        <div class="spinner-border text-teal" role="status"></div>
+                    </div>
+
+                    <div v-else-if="bankAccounts.length === 0" class="text-center py-4 text-muted">
+                        <i class="fas fa-university fa-2x mb-3 opacity-25"></i>
+                        <p>No hay cuentas bancarias configuradas por el momento.</p>
+                    </div>
+
+                    <div v-else class="d-flex flex-column gap-3">
+                        <div v-for="acc in bankAccounts" :key="acc.id" class="card border-0 shadow-sm">
+                            <div class="card-body">
+                                <h6 class="fw-bold text-teal mb-2">{{ acc.bank_name }}</h6>
+                                <div class="small text-muted mb-1">BENEFICIARIO: <strong class="text-dark">{{ acc.beneficiary }}</strong></div>
+                                <div class="d-flex justify-content-between align-items-center bg-light p-2 rounded mb-2">
+                                    <span class="small text-muted">CLABE:</span>
+                                    <span class="user-select-all fw-bold font-monospace">{{ acc.clabe }}</span>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center bg-light p-2 rounded">
+                                    <span class="small text-muted">CUENTA:</span>
+                                    <span class="user-select-all fw-bold font-monospace">{{ acc.account_number }}</span>
+                                </div>
+                                <div v-if="acc.notes" class="mt-2 text-muted x-small fst-italic">
+                                    Nota: {{ acc.notes }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 bg-light rounded-bottom-4 justify-content-center">
+                    <button class="btn btn-outline-secondary rounded-pill px-4" @click="showDonationModal = false">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
   </div>
 </template>
 
@@ -194,6 +252,8 @@ const supabase = useSupabaseClient()
 const user = useSupabaseUser()
 const { organizationId, profile } = useOrganization()
 const { notifyRequestCompromised } = usePushNotificationSender()
+// Importar composable de bancos
+const { bankAccounts, loading: loadingBanks, fetchBankAccounts } = useBankInfo()
 
 const activeTab = ref('needs')
 const requests = ref<any[]>([])
@@ -202,7 +262,7 @@ const centers = ref<any[]>([])
 const loading = ref(true)
 const loadingCommits = ref(false)
 
-// MODAL STATE
+// MODAL SURTIR STATE
 const showModal = ref(false)
 const submitting = ref(false)
 const selectedReq = ref<any>(null)
@@ -210,6 +270,24 @@ const form = reactive({
     quantity: 1,
     collection_center_id: '',
     delivery_date: ''
+})
+
+// MODAL DONACIÓN STATE
+const showDonationModal = ref(false)
+const openDonationModal = async () => {
+    showDonationModal.value = true
+    if (bankAccounts.value.length === 0) {
+        await fetchBankAccounts()
+    }
+}
+
+// Computed Roles
+const isAdmin = computed(() => {
+    return user.value?.app_metadata?.role === 'ADMIN' || user.value?.user_metadata?.role === 'ADMIN' || profile.value?.role === 'ADMIN'
+})
+
+const isPatrocinador = computed(() => {
+    return isAdmin.value || profile.value?.role === 'APORTADOR'
 })
 
 // FETCH DATA
@@ -255,10 +333,6 @@ const fetchData = async () => {
 
     loading.value = false
 }
-
-const isAdmin = computed(() => {
-    return user.value?.app_metadata?.role === 'ADMIN' || user.value?.user_metadata?.role === 'ADMIN' || profile.value?.role === 'ADMIN'
-})
 
 // Toggle for Admin to view all
 const showAllCommits = ref(false)
