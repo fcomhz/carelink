@@ -474,13 +474,16 @@ const updateOrgName = async () => {
 }
 
 const fetchUsers = async () => {
+  if (!organizationId.value) return
   loadingUsers.value = true
   const { data, error } = await supabase.schema('app_carelink')
     .from('profiles')
     .select('*')
+    .eq('organization_id', organizationId.value)
     .order('full_name')
   
   if (!error) users.value = data || []
+  else console.error('Error fetching users:', error)
   loadingUsers.value = false
 }
 
