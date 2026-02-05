@@ -7,11 +7,11 @@
             <div class="d-flex justify-content-between align-items-center mb-4 pt-3 border-bottom pb-3">
                 <div>
                    <h5 class="text-teal fw-bold mb-0"><i class="fas fa-chart-line me-2"></i>FINANZAS Y BALANCE</h5>
-                   <small class="text-muted">Administración de ingresos, egresos y balance operativo.</small>
+                   <small class="text-muted">Administración integral de ingresos, egresos y donativos.</small>
                 </div>
                 <div class="d-flex gap-2">
                     <!-- Month Selector -->
-                     <input type="month" v-model="selectedMonth" class="form-control" @change="fetchRecords">
+                     <input type="month" v-model="selectedMonth" class="form-control" @change="fetchAllData">
                      
                      <button v-if="isAdmin" class="btn btn-teal rounded-pill shadow-sm px-4" @click="openModal">
                         <i class="fas fa-plus me-1"></i> Nuevo Movimiento
@@ -19,8 +19,8 @@
                 </div>
             </div>
 
-            <!-- SUMMARY CARDS -->
-            <div class="row g-3 mb-4">
+            <!-- SUMMARY CARDS - ROW 1: Core Balance -->
+            <div class="row g-3 mb-3">
                 <!-- OPERATIONAL BALANCE -->
                 <div class="col-md-4">
                     <div class="card border-0 shadow-sm p-3 h-100 bg-light">
@@ -54,7 +54,7 @@
                              <span class="text-muted small">Gastos Extra (OUT):</span>
                              <span class="text-danger fw-bold">- {{ formatCurrency(balance.eventualExpense) }}</span>
                         </div>
-                        <p class="text-muted x-small mb-0">Incluye donativos en especie y compras de emergencia.</p>
+                        <p class="text-muted x-small mb-0">Incluye donativos en efectivo y compras de emergencia.</p>
                     </div>
                 </div>
 
@@ -70,14 +70,55 @@
                 </div>
             </div>
 
+            <!-- SUMMARY CARDS - ROW 2: Needs & Donations -->
+            <div class="row g-3 mb-4">
+                <!-- PENDING NEEDS -->
+                <div class="col-md-6">
+                    <div class="card border-0 shadow-sm p-3 h-100 border-start border-4 border-warning">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h6 class="text-muted small fw-bold text-uppercase mb-1">Necesidades Pendientes</h6>
+                                <p class="text-muted x-small mb-2">Valor estimado de solicitudes aprobadas sin surtir</p>
+                            </div>
+                            <i class="fas fa-clock fa-lg text-warning opacity-50"></i>
+                        </div>
+                        <h3 class="fw-bold text-warning mb-0">{{ formatCurrency(pendingNeedsValue) }}</h3>
+                        <small class="text-muted">Por cubrir (compra o donativo)</small>
+                    </div>
+                </div>
+
+                <!-- DONATION SAVINGS -->
+                <div class="col-md-6">
+                     <div class="card border-0 shadow-sm p-3 h-100 border-start border-4 border-success">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h6 class="text-muted small fw-bold text-uppercase mb-1">Ahorro por Donativos</h6>
+                                <p class="text-muted x-small mb-2">Valor de insumos recibidos en especie</p>
+                            </div>
+                            <i class="fas fa-hand-holding-heart fa-lg text-success opacity-50"></i>
+                        </div>
+                        <h3 class="fw-bold text-success mb-0">{{ formatCurrency(donationSavings) }}</h3>
+                        <small class="text-muted">No se tuvo que comprar</small>
+                     </div>
+                </div>
+            </div>
+
             <!-- FILTERS & LIST -->
              <div class="card border-0 shadow-sm rounded-4">
-                 <div class="card-header bg-white border-0 pt-4 px-4 d-flex justify-content-between align-items-center">
+                 <div class="card-header bg-white border-0 pt-4 px-4 d-flex justify-content-between align-items-center flex-wrap gap-2">
                      <h6 class="fw-bold mb-0">Movimientos del Mes</h6>
-                     <div class="btn-group btn-group-sm">
-                         <button class="btn btn-outline-secondary" :class="{active: filterType === 'ALL'}" @click="filterType = 'ALL'">Todos</button>
-                         <button class="btn btn-outline-success" :class="{active: filterType === 'IN'}" @click="filterType = 'IN'">Ingresos</button>
-                         <button class="btn btn-outline-danger" :class="{active: filterType === 'OUT'}" @click="filterType = 'OUT'">Egresos</button>
+                     <div class="d-flex gap-2 flex-wrap">
+                         <!-- Type Filter -->
+                         <div class="btn-group btn-group-sm">
+                             <button class="btn btn-outline-secondary" :class="{active: filterType === 'ALL'}" @click="filterType = 'ALL'">Todos</button>
+                             <button class="btn btn-outline-success" :class="{active: filterType === 'INGRESO'}" @click="filterType = 'INGRESO'">Ingresos</button>
+                             <button class="btn btn-outline-danger" :class="{active: filterType === 'EGRESO'}" @click="filterType = 'EGRESO'">Egresos</button>
+                         </div>
+                         <!-- Category Filter -->
+                         <select v-model="filterCategory" class="form-select form-select-sm" style="max-width: 180px;">
+                             <option value="ALL">Todas categorías</option>
+                             <option v-for="cat in categories" :key="cat.name" :value="cat.name">{{ cat.display_name }}</option>
+                         </select>
                      </div>
                  </div>
                  <div class="card-body p-0">
@@ -99,15 +140,23 @@
                              <tbody>
                                  <tr v-for="rec in filteredRecords" :key="rec.id">
                                      <td class="ps-4 small text-muted">{{ rec.date_occurred }}</td>
-                                     <td class="fw-bold text-dark">{{ rec.concept }}</td>
-                                     <td><span class="badge bg-light text-dark border">{{ rec.category }}</span></td>
+                                     <td class="fw-bold text-dark">
+                                         {{ rec.concept }}
+                                         <div v-if="rec.subcategory" class="x-small text-muted">{{ rec.subcategory }}</div>
+                                     </td>
+                                     <td>
+                                         <span class="badge bg-light text-dark border">
+                                             <i v-if="getCategoryIcon(rec.category)" :class="['fas', getCategoryIcon(rec.category), 'me-1']"></i>
+                                             {{ getCategoryDisplayName(rec.category) }}
+                                         </span>
+                                     </td>
                                      <td>
                                          <span class="badge" :class="rec.frequency === 'REGULAR' ? 'bg-primary-subtle text-primary' : 'bg-warning-subtle text-warning-emphasis'">
                                              {{ rec.frequency || 'EVENTUAL' }}
                                          </span>
                                      </td>
-                                     <td class="text-end pe-4 fw-bold" :class="rec.type === 'IN' ? 'text-success' : 'text-danger'">
-                                         {{ rec.type === 'IN' ? '+' : '-' }} {{ formatCurrency(rec.amount) }}
+                                     <td class="text-end pe-4 fw-bold" :class="rec.type === 'INGRESO' || rec.type === 'IN' ? 'text-success' : 'text-danger'">
+                                         {{ rec.type === 'INGRESO' || rec.type === 'IN' ? '+' : '-' }} {{ formatCurrency(rec.amount) }}
                                      </td>
                                      <td v-if="isAdmin" class="text-end">
                                          <button class="btn btn-sm btn-light text-teal me-1" title="Editar" @click="openModal(rec)">
@@ -143,9 +192,9 @@
                         <div class="row">
                             <div class="col-6 mb-3">
                                 <label class="form-label small fw-bold text-muted">Tipo</label>
-                                <select v-model="form.type" class="form-select" required>
-                                    <option value="IN">Ingreso (+)</option>
-                                    <option value="OUT">Egreso (-)</option>
+                                <select v-model="form.type" class="form-select" required @change="form.category = ''">
+                                    <option value="INGRESO">Ingreso (+)</option>
+                                    <option value="EGRESO">Egreso (-)</option>
                                 </select>
                             </div>
                             <div class="col-6 mb-3">
@@ -155,6 +204,28 @@
                                     <option value="EVENTUAL">Eventual / Único</option>
                                 </select>
                             </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold text-muted">Categoría</label>
+                            <select v-model="form.category" class="form-select" required>
+                                <option value="" disabled>Selecciona una categoría...</option>
+                                <option v-for="cat in filteredCategories" :key="cat.name" :value="cat.name">
+                                    {{ cat.display_name }}
+                                </option>
+                            </select>
+                        </div>
+
+                        <div v-if="form.category === 'SERVICIOS'" class="mb-3">
+                            <label class="form-label small fw-bold text-muted">Subcategoría (Servicio)</label>
+                            <select v-model="form.subcategory" class="form-select">
+                                <option value="">Sin especificar</option>
+                                <option value="Luz">Luz (CFE)</option>
+                                <option value="Gas">Gas</option>
+                                <option value="Agua">Agua</option>
+                                <option value="Internet">Internet / Teléfono</option>
+                                <option value="Otro">Otro servicio</option>
+                            </select>
                         </div>
 
                         <div class="mb-3">
@@ -171,20 +242,8 @@
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label small fw-bold text-muted">Concepto</label>
-                            <input type="text" v-model="form.concept" class="form-control" placeholder="Ej. Renta de Oficina, Donativo Sr. Pérez..." required>
-                        </div>
-                        
-                         <div class="mb-3">
-                            <label class="form-label small fw-bold text-muted">Categoría</label>
-                            <input type="text" v-model="form.category" class="form-control" placeholder="Ej. Servicios, Nómina, Donativos..." list="catList">
-                            <datalist id="catList">
-                                <option value="Servicios"></option>
-                                <option value="Nómina"></option>
-                                <option value="Donativo Efectivo"></option>
-                                <option value="Mantenimiento"></option>
-                                <option value="Materiales"></option>
-                            </datalist>
+                            <label class="form-label small fw-bold text-muted">Concepto / Descripción</label>
+                            <input type="text" v-model="form.concept" class="form-control" placeholder="Ej. Renta Enero, Donativo Sr. Pérez..." required>
                         </div>
 
                         <div class="d-flex justify-content-end gap-2 mt-4">
@@ -202,72 +261,87 @@
 <script setup lang="ts">
 const supabase = useSupabaseClient()
 const { organizationId, profile } = useOrganization()
+const { fetchPendingNeedsValue, fetchDonationSavings, fetchCategories, calculateMonthlyBalance } = useFinanceMetrics()
 
 const isAdmin = computed(() => profile.value?.role === 'ADMIN')
 
 // State
 const records = ref<any[]>([])
+const categories = ref<any[]>([])
 const loading = ref(true)
 const submitting = ref(false)
 const showModal = ref(false)
 const selectedMonth = ref(new Date().toISOString().slice(0, 7)) // YYYY-MM
 const filterType = ref('ALL')
+const filterCategory = ref('ALL')
+
+// Extra Metrics
+const pendingNeedsValue = ref(0)
+const donationSavings = ref(0)
 
 // Form
 const form = reactive({
     id: null as string | null,
-    type: 'OUT',
+    type: 'EGRESO',
     frequency: 'EVENTUAL',
+    category: '',
+    subcategory: '',
     date_occurred: new Date().toISOString().split('T')[0],
     amount: 0,
-    concept: '',
-    category: ''
+    concept: ''
 })
 
-// Metrics
-const balance = computed(() => {
-    let regularIncome = 0
-    let eventualIncome = 0
-    let regularExpense = 0
-    let eventualExpense = 0
+// Computed: Balance
+const balance = computed(() => calculateMonthlyBalance(records.value))
 
-    records.value.forEach(r => {
-        const val = Number(r.amount)
-        if (r.type === 'IN') {
-            if (r.frequency === 'REGULAR') regularIncome += val
-            else eventualIncome += val
-        } else {
-            if (r.frequency === 'REGULAR') regularExpense += val
-            else eventualExpense += val
-        }
-    })
-
-    return {
-        regularIncome,
-        eventualIncome,
-        regularExpense,
-        eventualExpense,
-        operational: regularIncome - regularExpense,
-        net: (regularIncome + eventualIncome) - (regularExpense + eventualExpense)
-    }
+// Computed: Filtered categories for form (based on type)
+const filteredCategories = computed(() => {
+    return categories.value.filter(c => c.type === form.type)
 })
 
+// Computed: Filtered records for table
 const filteredRecords = computed(() => {
-    if (filterType.value === 'ALL') return records.value
-    return records.value.filter(r => r.type === filterType.value)
+    let result = records.value
+    
+    if (filterType.value !== 'ALL') {
+        result = result.filter(r => r.type === filterType.value || 
+            (filterType.value === 'INGRESO' && r.type === 'IN') ||
+            (filterType.value === 'EGRESO' && r.type === 'OUT'))
+    }
+    
+    if (filterCategory.value !== 'ALL') {
+        result = result.filter(r => r.category === filterCategory.value)
+    }
+    
+    return result
 })
+
+// Category helpers
+const getCategoryDisplayName = (catName: string) => {
+    const cat = categories.value.find(c => c.name === catName)
+    return cat?.display_name || catName || 'General'
+}
+
+const getCategoryIcon = (catName: string) => {
+    const cat = categories.value.find(c => c.name === catName)
+    return cat?.icon || null
+}
 
 // METHODS
 const formatCurrency = (val: number) => {
     return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(val)
 }
 
-const fetchRecords = async () => {
+const fetchAllData = async () => {
     loading.value = true
-    const [year, month] = selectedMonth.value.split('-')
     
+    // Fetch categories
+    categories.value = await fetchCategories()
+    
+    // Fetch records for selected month
+    const [year, month] = selectedMonth.value.split('-')
     const startDate = `${selectedMonth.value}-01`
-    const endDate = new Date(Number(year), Number(month), 0).toISOString().split('T')[0] // Last day of month
+    const endDate = new Date(Number(year), Number(month), 0).toISOString().split('T')[0]
 
     const { data, error } = await supabase.schema('app_carelink')
         .from('finance_records')
@@ -278,27 +352,34 @@ const fetchRecords = async () => {
     
     if (error) console.error(error)
     records.value = data || []
+    
+    // Fetch extra metrics
+    pendingNeedsValue.value = await fetchPendingNeedsValue()
+    donationSavings.value = await fetchDonationSavings()
+    
     loading.value = false
 }
 
 const openModal = (record: any = null) => {
-    if (record) {
+    if (record && record.id) {
         // Edit Mode
         form.id = record.id
-        form.type = record.type
+        form.type = record.type === 'IN' ? 'INGRESO' : (record.type === 'OUT' ? 'EGRESO' : record.type)
         form.frequency = record.frequency || 'EVENTUAL'
+        form.category = record.category || ''
+        form.subcategory = record.subcategory || ''
         form.date_occurred = record.date_occurred
         form.amount = record.amount
         form.concept = record.concept
-        form.category = record.category
     } else {
         // Create Mode
         form.id = null
-        form.type = 'OUT'
+        form.type = 'EGRESO'
         form.frequency = 'EVENTUAL'
+        form.category = ''
+        form.subcategory = ''
         form.amount = 0
         form.concept = ''
-        form.category = ''
         form.date_occurred = new Date().toISOString().split('T')[0]
     }
     showModal.value = true
@@ -320,16 +401,15 @@ const handleSubmit = async () => {
             amount: form.amount,
             concept: form.concept,
             category: form.category,
-            recorded_by: profile.value.id
+            subcategory: form.subcategory || null,
+            recorded_by: profile.value?.id
         }
 
         let error
         if (form.id) {
-            // Update
             const res = await supabase.schema('app_carelink').from('finance_records').update(payload).eq('id', form.id)
             error = res.error
         } else {
-            // Insert
             const res = await supabase.schema('app_carelink').from('finance_records').insert(payload)
             error = res.error
         }
@@ -338,7 +418,7 @@ const handleSubmit = async () => {
         
         alert(form.id ? 'Movimiento actualizado.' : 'Movimiento registrado.')
         closeModal()
-        await fetchRecords()
+        await fetchAllData()
         
     } catch (e: any) {
         alert('Error: ' + e.message)
@@ -356,13 +436,13 @@ const deleteRecord = async (id: string) => {
             .eq('id', id)
         
         if (error) throw error
-        await fetchRecords()
+        await fetchAllData()
     } catch (e: any) {
         alert('Error: ' + e.message)
     }
 }
 
 onMounted(() => {
-    fetchRecords()
+    fetchAllData()
 })
 </script>
