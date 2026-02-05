@@ -168,6 +168,7 @@
 const supabase = useSupabaseClient()
 const user = useSupabaseUser()
 const { organizationId, profile } = useOrganization()
+const { notifyRequestCompromised } = usePushNotificationSender()
 
 const activeTab = ref('needs')
 const requests = ref<any[]>([])
@@ -309,6 +310,13 @@ const saveCommitment = async () => {
     if (error) {
         alert('Error al guardar compromiso: ' + error.message)
     } else {
+        // Notify Admins
+        try {
+            await notifyRequestCompromised(selectedReq.value.item,  profile.value?.full_name || 'Usuario')
+        } catch (pushErr) {
+            console.error('Push notification failed:', pushErr)
+        }
+
         alert('¡Compromiso registrado con éxito!')
         showModal.value = false 
         

@@ -44,7 +44,7 @@ export const usePushNotificationSender = () => {
     /**
      * Notify admins about a new request
      */
-    const notifyNewRequest = async (itemName: string, requesterName: string) => {
+    const notifyNewRequest = async (itemName: string, requesterName: string, requesterId?: string, organizationId?: string) => {
         return sendNotification({
             title: '📋 Nueva Solicitud',
             body: `${requesterName} solicitó: ${itemName}`,
@@ -56,12 +56,24 @@ export const usePushNotificationSender = () => {
     /**
      * Notify about a new chat message
      */
-    const notifyNewMessage = async (ticketTitle: string, senderName: string, targetUserIds?: string[]) => {
+    const notifyNewMessage = async (ticketTitle: string, senderName: string, messagePreview: string, targetUserIds?: string[]) => {
         return sendNotification({
-            title: '💬 Nuevo Mensaje',
-            body: `${senderName} escribió en: ${ticketTitle}`,
+            title: `💬 ${senderName} en: ${ticketTitle}`,
+            body: messagePreview,
             url: '/chat',
             targetUserIds,
+            excludeSelf: true
+        })
+    }
+
+    /**
+     * Notify admins that someone committed to fulfill a request
+     */
+    const notifyRequestCompromised = async (itemName: string, donorName: string) => {
+        return sendNotification({
+            title: '🤝 Nuevo Compromiso',
+            body: `${donorName} se comprometió a surtir: ${itemName}`,
+            url: '/surtir',
             excludeSelf: true
         })
     }

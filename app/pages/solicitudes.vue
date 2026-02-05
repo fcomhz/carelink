@@ -232,6 +232,7 @@
 <script setup lang="ts">
 const supabase = useSupabaseClient()
 const { profile, organizationId } = useOrganization()
+const { notifyNewRequest, sendNotification } = usePushNotificationSender() 
 
 const isAdmin = computed(() => profile.value?.role === 'ADMIN')
 
@@ -461,6 +462,18 @@ const handleSubmit = async () => {
 
         const { error } = await supabase.schema('app_carelink').from('requests').insert(payload)
         if (error) throw error
+
+        // 3.1 Notify Admins
+        try {
+            await notifyNewRequest(
+                form.item, 
+                profile.value?.full_name || 'Usuario', 
+                profile.value?.id || '',
+                organizationId.value
+            )
+        } catch (pushErr) {
+            console.error('Push notification failed but request created:', pushErr)
+        }
 
         await fetchMetadata()
         closeModal()
