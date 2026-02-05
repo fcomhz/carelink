@@ -28,7 +28,7 @@ export const useOrganization = () => {
         try {
             console.log('Fetching profile for UUID:', currentUser.id);
             const { data, error } = await client
-                .from('profiles')
+                .from('app_carelink.profiles')
                 .select('*, organizations(*)')
                 .eq('id', currentUser.id)
                 .single();
