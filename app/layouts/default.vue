@@ -67,6 +67,11 @@
                 </NuxtLink>
             </div>
         </nav>
+
+        <!-- Push Notification Prompt (Client Only) -->
+        <ClientOnly>
+            <PushNotificationPrompt />
+        </ClientOnly>
     </div>
 </template>
 
@@ -79,8 +84,6 @@ const router = useRouter()
 const isAdmin = computed(() => profile.value?.role === 'ADMIN')
 const isAsistente = computed(() => ['ASISTENTE', 'ENFERMERO'].includes(profile.value?.role))
 const isPatrocinador = computed(() => profile.value?.role === 'APORTADOR')
-
-
 
 onMounted(async () => {
     if (user.value) {
