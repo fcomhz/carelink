@@ -61,7 +61,8 @@ const handleLogin = async () => {
   if (error) {
     alert('Error: ' + error.message)
   } else {
-    router.push('/')
+    // Force full reload to ensure plugins and profile fetch run clean
+    window.location.href = '/'
   }
   loading.value = false
 }

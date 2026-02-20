@@ -119,6 +119,7 @@ export const usePushNotificationSender = () => {
         notifyNewMessage,
         notifyNewAnnouncement,
         notifyRequestApproved,
-        notifyDonationReceived
+        notifyDonationReceived,
+        notifyRequestCompromised
     }
 }

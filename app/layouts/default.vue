@@ -85,21 +85,42 @@ const isAdmin = computed(() => profile.value?.role === 'ADMIN')
 const isAsistente = computed(() => ['ASISTENTE', 'ENFERMERO'].includes(profile.value?.role))
 const isPatrocinador = computed(() => profile.value?.role === 'APORTADOR')
 
+
+const logout = async () => {
+    await supabase.auth.signOut()
+    router.push('/login')
+}
+
+// Watch user state to redirect if session is lost
+watch(user, (u) => {
+    if (!u) {
+        router.push('/login')
+    }
+})
+
 onMounted(async () => {
-    if (user.value) {
-        await fetchProfile()
+    if (!user.value) {
+        // Double check if we are on a protected route (handled by middleware usually, but layout is a safety net)
+        if (router.currentRoute.value.path !== '/login') {
+            router.push('/login')
+        }
+    } else {
+        const fetchedProfile = await fetchProfile()
         
+        // If fetchProfile returns null (because error/ghost session), useOrganization logic handles logout, 
+        // but we can double check here
+        if (!fetchedProfile && !profile.value) {
+            console.warn('Layout: Profile failed to load. Redirecting...')
+            await logout()
+            return
+        }
+
         // Logical redirection based on access if landing on non-accessible home
         if (isAsistente.value && router.currentRoute.value.path === '/') {
             router.push('/solicitudes')
         }
     }
 })
-
-const logout = async () => {
-    await supabase.auth.signOut()
-    router.push('/login')
-}
 </script>
 
 <style scoped>

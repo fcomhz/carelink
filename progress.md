@@ -1,5 +1,57 @@
 # Progreso del Proyecto CareLink
 
+## 🟢 Sesión: Finanzas Pro y Seguimiento de Compromisos (19 Feb 2026)
+
+### 1. 🛡️ Estabilidad y Sesiones (Ghost Sessions)
+Se resolvió el problema de "sesiones fantasma" y datos incorrectos tras el login.
+- **Fix RLS Recursion**: Eliminada la recursividad en las políticas de seguridad que bloqueaba el acceso.
+- **Login Robusto**: Sincronización corregida entre Supabase Auth y el perfil de la organización.
+
+### 2. 💰 Finanzas Avanzadas
+Potenciación del módulo de Finanzas para gastos operativos.
+- **Gastos Recurrentes**: Capacidad de programar gastos (mensual, quincenal, etc.) con pre-generación automática de registros.
+- **Filtros Flexibles**: Reemplazado el selector de mes por un rango de fechas (Desde/Hasta) para reportes personalizados.
+- **RLS Finance**: Blindaje de registros financieros por organización y rol.
+
+### 3. 🤝 Control de Compromisos (Surtir)
+Mejoras críticas en la logística de donaciones en especie.
+- **Seguimiento Admin**: Nueva pestaña "Compromisos Pendientes" para administradores.
+- **Alertas de Vencimiento**: Resaltado visual (Rojo/VENCIDO) para entregas que han superado su fecha prometida.
+- **Herramientas de Contacto**: 
+  - Botón de **WhatsApp** con mensaje pre-llenado para el donante.
+  - Botón de **Aviso App** (Push notification) para recordatorios internos.
+- **Integridad de Datos**: Reestructuración de relaciones (FKs) en la BD para asegurar que todos los compromisos sean visibles en las listas.
+
+---
+
+## 🟢 Sesión: Gestión de Usuarios, Donaciones y Balance (05 Feb 2026)
+
+### 1. 👥 Gestión de Usuarios y Seguridad (Multi-tenant)
+Se ha blindado la seguridad y la correcta separación de organizaciones.
+- **Corrección RLS**: Implementadas políticas recursivas seguras (`FIX_RLS_RECURSION.sql`) para evitar errores 500.
+- **Visibilidad**: Los usuarios ahora solo ven perfiles de su propia organización ("GabyMartínez").
+- **Limpieza**: Eliminados usuarios fantasma de otras organizaciones (OPMobility, Solu360) que aparecían por error.
+- **Admin**: Corregido filtro en `admin.vue` para gestionar usuarios correctamente.
+
+### 2. 💖 Vista de Patrocinador (Donaciones)
+Mejoras en la experiencia para el rol `APORTADOR` (Patrocinador).
+- **Botón "Donar Dinero"**: Agregado en la sección `/surtir`.
+- **Datos Bancarios**: Modal que muestra cuentas (CLABE, Banco, Beneficiario) de la organización.
+- **Composable**: Creado `useBankInfo.ts` para reutilizar lógica de datos bancarios.
+
+### 3. 📦 Mejoras en Sección "Surtir"
+- **Información Detallada**: Ahora las tarjetas muestran:
+  - Costo Unitario Estimado.
+  - Costo Total a surtir.
+  - Proveedor Sugerido.
+- **Objetivo**: Ayudar a los aportadores a decidir mejor qué necesidades cubrir.
+
+### 4. 💰 Módulo de Balance (Refinamiento Previo)
+- Preparada la estructura para **Categorías y Subcategorías** (`EXTEND_FINANCE_MODULE.sql`).
+- Nuevas métricas: "Ahorro por Donativos" y "Necesidades Pendientes".
+
+---
+
 ## 🟢 Sesión: Finanzas e Inventario (30 Ene 2026)
 
 ### 1. 💰 Módulo de Finanzas (¡Nuevo!) [Ver walkthrough](../.gemini/antigravity/brain/e5311563-87d0-4dd1-97da-ed7060c63120/walkthrough.md)

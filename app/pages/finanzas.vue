@@ -10,8 +10,12 @@
                    <small class="text-muted">Administración integral de ingresos, egresos y donativos.</small>
                 </div>
                 <div class="d-flex gap-2">
-                    <!-- Month Selector -->
-                     <input type="month" v-model="selectedMonth" class="form-control" @change="fetchAllData">
+                    <!-- Date Range Selector -->
+                    <div class="d-flex align-items-center gap-2">
+                        <input type="date" v-model="filterStartDate" class="form-control form-control-sm" @change="fetchAllData">
+                        <span class="text-muted">-</span>
+                        <input type="date" v-model="filterEndDate" class="form-control form-control-sm" @change="fetchAllData">
+                    </div>
                      
                      <button v-if="isAdmin" class="btn btn-teal rounded-pill shadow-sm px-4" @click="openModal">
                         <i class="fas fa-plus me-1"></i> Nuevo Movimiento
@@ -200,9 +204,35 @@
                             <div class="col-6 mb-3">
                                 <label class="form-label small fw-bold text-muted">Frecuencia</label>
                                  <select v-model="form.frequency" class="form-select" required>
-                                    <option value="REGULAR">Regular / Recurrente</option>
                                     <option value="EVENTUAL">Eventual / Único</option>
+                                    <option value="REGULAR">Regular / Recurrente</option>
                                 </select>
+                            </div>
+                        </div>
+
+                        <!-- Recurrence Options -->
+                        <div v-if="form.frequency === 'REGULAR'" class="card bg-light border-0 p-3 mb-3">
+                            <h6 class="text-teal small fw-bold mb-2">Configuración de Recurrencia</h6>
+                            <div class="row">
+                                <div class="col-6">
+                                    <label class="form-label x-small text-muted">Repetir cada:</label>
+                                    <select v-model="form.recurrence_type" class="form-select form-select-sm">
+                                        <option value="MONTHLY">Mes</option>
+                                        <option value="WEEKLY">Semana</option>
+                                        <option value="BIWEEKLY">Quincena</option>
+                                        <option value="YEARLY">Año</option>
+                                    </select>
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label x-small text-muted">Cantidad de veces:</label>
+                                    <input type="number" v-model="form.recurrence_total" class="form-control form-control-sm" min="2" max="60">
+                                </div>
+                                <div class="col-12 mt-2">
+                                    <small class="text-muted x-small">
+                                        <i class="fas fa-info-circle me-1"></i>
+                                        Se generarán <strong>{{ form.recurrence_total }}</strong> registros individuales hacia el futuro.
+                                    </small>
+                                </div>
                             </div>
                         </div>
 
@@ -271,7 +301,10 @@ const categories = ref<any[]>([])
 const loading = ref(true)
 const submitting = ref(false)
 const showModal = ref(false)
-const selectedMonth = ref(new Date().toISOString().slice(0, 7)) // YYYY-MM
+// const selectedMonth = ref(new Date().toISOString().slice(0, 7)) // YYYY-MM REPLACED
+const now = new Date()
+const filterStartDate = ref(new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0])
+const filterEndDate = ref(new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0])
 const filterType = ref('ALL')
 const filterCategory = ref('ALL')
 
@@ -288,7 +321,10 @@ const form = reactive({
     subcategory: '',
     date_occurred: new Date().toISOString().split('T')[0],
     amount: 0,
-    concept: ''
+    concept: '',
+    // Recurrence
+    recurrence_type: 'MONTHLY',
+    recurrence_total: 12
 })
 
 // Computed: Balance
@@ -338,16 +374,17 @@ const fetchAllData = async () => {
     // Fetch categories
     categories.value = await fetchCategories()
     
-    // Fetch records for selected month
-    const [year, month] = selectedMonth.value.split('-')
-    const startDate = `${selectedMonth.value}-01`
-    const endDate = new Date(Number(year), Number(month), 0).toISOString().split('T')[0]
+    // Fetch records for selected date range
+    // const [year, month] = selectedMonth.value.split('-')
+    // const startDate = `${selectedMonth.value}-01`
+    // const endDate = new Date(Number(year), Number(month), 0).toISOString().split('T')[0]
 
     const { data, error } = await supabase.schema('app_carelink')
         .from('finance_records')
         .select('*')
-        .gte('date_occurred', startDate)
-        .lte('date_occurred', endDate)
+        .select('*')
+        .gte('date_occurred', filterStartDate.value)
+        .lte('date_occurred', filterEndDate.value)
         .order('date_occurred', { ascending: false })
     
     if (error) console.error(error)
@@ -381,6 +418,10 @@ const openModal = (record: any = null) => {
         form.amount = 0
         form.concept = ''
         form.date_occurred = new Date().toISOString().split('T')[0]
+        
+        // Reset recurrence defaults
+        form.recurrence_type = 'MONTHLY'
+        form.recurrence_total = 12
     }
     showModal.value = true
 }
@@ -393,24 +434,80 @@ const handleSubmit = async () => {
     if (!organizationId.value) return
     submitting.value = true
     try {
-        const payload = {
-            organization_id: organizationId.value,
-            date_occurred: form.date_occurred,
-            type: form.type,
-            frequency: form.frequency,
-            amount: form.amount,
-            concept: form.concept,
-            category: form.category,
-            subcategory: form.subcategory || null,
-            recorded_by: profile.value?.id
-        }
-
         let error
+
         if (form.id) {
+            // EDIT EXISTING
+            const payload = {
+                organization_id: organizationId.value,
+                date_occurred: form.date_occurred,
+                type: form.type,
+                frequency: form.frequency,
+                amount: form.amount,
+                concept: form.concept,
+                category: form.category,
+                subcategory: form.subcategory || null,
+                recorded_by: profile.value?.id
+            }
             const res = await supabase.schema('app_carelink').from('finance_records').update(payload).eq('id', form.id)
             error = res.error
         } else {
-            const res = await supabase.schema('app_carelink').from('finance_records').insert(payload)
+            // NEW RECORD (HANDLE RECURRENCE)
+            const recordsToInsert = []
+            
+            if (form.frequency === 'REGULAR' && form.recurrence_total > 1) {
+                // Generate Series
+                const recurrenceId = crypto.randomUUID() // Client-side UUID generation if available or use a library. 
+                // Browsers usually support crypto.randomUUID()
+                
+                let baseDate = new Date(form.date_occurred + 'T12:00:00') // Avoid timezone shift
+                
+                for (let i = 0; i < form.recurrence_total; i++) {
+                    let nextDate = new Date(baseDate)
+                    
+                    // Increment based on type
+                    if (form.recurrence_type === 'MONTHLY') {
+                        nextDate.setMonth(baseDate.getMonth() + i)
+                    } else if (form.recurrence_type === 'WEEKLY') {
+                        nextDate.setDate(baseDate.getDate() + (i * 7))
+                    } else if (form.recurrence_type === 'BIWEEKLY') {
+                         nextDate.setDate(baseDate.getDate() + (i * 14))
+                    } else if (form.recurrence_type === 'YEARLY') {
+                        nextDate.setFullYear(baseDate.getFullYear() + i)
+                    }
+
+                    recordsToInsert.push({
+                        organization_id: organizationId.value,
+                        date_occurred: nextDate.toISOString().split('T')[0],
+                        type: form.type,
+                        frequency: form.frequency,
+                        amount: form.amount,
+                        concept: `${form.concept} (${i + 1}/${form.recurrence_total})`,
+                        category: form.category,
+                        subcategory: form.subcategory || null,
+                        recorded_by: profile.value?.id,
+                        recurrence_id: recurrenceId,
+                        recurrence_total: form.recurrence_total,
+                        recurrence_index: i + 1,
+                        recurrence_type: form.recurrence_type
+                    })
+                }
+            } else {
+                // Single Record
+                recordsToInsert.push({
+                    organization_id: organizationId.value,
+                    date_occurred: form.date_occurred,
+                    type: form.type,
+                    frequency: form.frequency,
+                    amount: form.amount,
+                    concept: form.concept,
+                    category: form.category,
+                    subcategory: form.subcategory || null,
+                    recorded_by: profile.value?.id
+                })
+            }
+
+            const res = await supabase.schema('app_carelink').from('finance_records').insert(recordsToInsert)
             error = res.error
         }
         

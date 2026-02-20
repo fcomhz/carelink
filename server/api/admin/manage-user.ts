@@ -28,7 +28,12 @@ export default defineEventHandler(async (event) => {
             // UPDATE EXISTING USER
             const updateData: any = {
                 email: email,
-                user_metadata: { full_name, role }
+                user_metadata: { full_name, role },
+                app_metadata: {
+                    schema: 'app_carelink',
+                    organization: 'GabyMartínez',
+                    organization_id: organization_id
+                }
             }
 
             if (password && password.length >= 6) {
@@ -44,7 +49,12 @@ export default defineEventHandler(async (event) => {
                 email: email,
                 password: password,
                 email_confirm: true,
-                user_metadata: { full_name, role }
+                user_metadata: { full_name, role },
+                app_metadata: {
+                    schema: 'app_carelink',
+                    organization: 'GabyMartínez',
+                    organization_id: organization_id
+                }
             })
 
             if (authError) throw authError

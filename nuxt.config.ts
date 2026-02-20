@@ -14,7 +14,7 @@ export default defineNuxtConfig({
         schema: 'app_carelink'
       }
     },
-    redirect: false
+    redirect: true
   },
 
   // PWA Configuration

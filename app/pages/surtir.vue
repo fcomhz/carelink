@@ -31,6 +31,13 @@
                 Mis Compromisos
             </button>
         </li>
+        <li v-if="isAdmin" class="nav-item">
+            <button class="nav-link rounded-pill px-4" 
+                :class="{ active: activeTab === 'allCommits' }"
+                @click="activeTab = 'allCommits'">
+                Compromisos Pendientes
+            </button>
+        </li>
     </ul>
 
     <div class="tab-content">
@@ -105,14 +112,6 @@
 
         <!-- TAB 2: MY COMMITMENTS -->
         <div v-if="activeTab === 'commits'" class="fade show active">
-            <!-- ADMIN TOGGLE -->
-            <div v-if="isAdmin" class="d-flex justify-content-end mb-3">
-                <div class="form-check form-switch">
-                    <input class="form-check-input" type="checkbox" id="flexSwitchCheckDefault" v-model="showAllCommits" @change="fetchMyCommits">
-                    <label class="form-check-label small fw-bold text-muted" for="flexSwitchCheckDefault">Ver compromisos de todos</label>
-                </div>
-            </div>
-
             <div v-if="loadingCommits" class="text-center py-5">
                 <div class="spinner-border text-teal" role="status"></div>
             </div>
@@ -130,11 +129,6 @@
                                  <div class="x-small text-muted mt-1">
                                      <i class="fas fa-map-marker-alt me-1"></i> {{ c.center?.name || 'Centro no especificado' }}
                                  </div>
-                                 <div v-if="c.user_profile" class="mt-2">
-                                    <span class="badge bg-light text-dark border">
-                                        <i class="fas fa-user me-1 text-muted"></i> {{ c.user_profile.full_name || c.user_profile.email }}
-                                    </span>
-                                 </div>
                              </div>
                              <div>
                                  <span :class="['badge', c.status === 'PENDIENTE' ? 'bg-warning text-dark' : 'bg-success']">
@@ -146,6 +140,62 @@
                  </div>
                  <div v-if="myCommits.length === 0" class="text-center py-5 text-muted">
                     <p>No tienes compromisos activos.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 3: ALL COMMITMENTS (Admin Only) -->
+        <div v-if="activeTab === 'allCommits' && isAdmin" class="fade show active">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="fw-bold text-muted mb-0 small uppercase">Seguimiento de Surtido (Admin)</h6>
+                <span class="badge bg-light text-dark border">Total: {{ myCommits.length }}</span>
+            </div>
+
+            <div v-if="loadingCommits" class="text-center py-5">
+                <div class="spinner-border text-teal" role="status"></div>
+            </div>
+            <div v-else class="row g-2">
+                <div v-for="c in myCommits" :key="c.id" class="col-12">
+                     <div class="card border-0 shadow-sm p-3" :class="{ 'border-start border-4 border-danger': isOverdue(c.delivery_date) && c.status === 'PENDIENTE' }">
+                         <div class="row align-items-center">
+                             <div class="col-md-7">
+                                 <div class="d-flex align-items-center gap-2 mb-1">
+                                     <strong class="text-dark">{{ c.request.item }}</strong>
+                                     <span class="badge bg-light text-muted border small">{{ c.quantity }} uds</span>
+                                 </div>
+                                 <div class="small mb-1">
+                                    <span class="text-muted">Donante:</span> 
+                                    <strong class="text-teal ms-1">{{ c.user_profile?.full_name || c.user_profile?.email || 'Anónimo' }}</strong>
+                                    <a v-if="c.user_profile?.phone" :href="getWhatsAppLink(c)" target="_blank" class="ms-2 text-success" title="Enviar WhatsApp">
+                                        <i class="fab fa-whatsapp"></i>
+                                    </a>
+                                 </div>
+                                 <div class="x-small" :class="isOverdue(c.delivery_date) && c.status === 'PENDIENTE' ? 'text-danger fw-bold' : 'text-muted'">
+                                     <i class="far fa-calendar-alt me-1"></i> 
+                                     Entrega: {{ c.delivery_date || 'Sin fecha' }}
+                                     <span v-if="isOverdue(c.delivery_date) && c.status === 'PENDIENTE'" class="ms-1">(VENCIDO)</span>
+                                 </div>
+                             </div>
+                             <div class="col-md-5 text-md-end mt-2 mt-md-0">
+                                 <div class="d-flex flex-column align-items-md-end gap-2">
+                                     <span :class="['badge', c.status === 'PENDIENTE' ? 'bg-warning text-dark' : 'bg-success']">
+                                         {{ c.status === 'PENDIENTE' ? 'PENDIENTE' : 'ENTREGADO' }}
+                                     </span>
+                                     <div class="d-flex gap-1" v-if="c.status === 'PENDIENTE'">
+                                         <button class="btn btn-xs btn-outline-teal py-1" @click="sendPushFollowUp(c)" title="Recordatorio por App">
+                                             <i class="fas fa-bell me-1"></i> Aviso App
+                                         </button>
+                                         <button v-if="isAdmin" class="btn btn-xs btn-outline-success py-1" @click="markAsFulfilled(c)" title="Marcar como entregado">
+                                             <i class="fas fa-check me-1"></i> Recibido
+                                         </button>
+                                     </div>
+                                 </div>
+                             </div>
+                         </div>
+                     </div>
+                 </div>
+                 <div v-if="myCommits.length === 0" class="text-center py-5 text-muted">
+                    <p>No hay compromisos registrados en el sistema.</p>
                 </div>
             </div>
         </div>
@@ -251,7 +301,7 @@
 const supabase = useSupabaseClient()
 const user = useSupabaseUser()
 const { organizationId, profile } = useOrganization()
-const { notifyRequestCompromised } = usePushNotificationSender()
+const { notifyRequestCompromised, sendNotification } = usePushNotificationSender()
 // Importar composable de bancos
 const { bankAccounts, loading: loadingBanks, fetchBankAccounts } = useBankInfo()
 
@@ -334,9 +384,6 @@ const fetchData = async () => {
     loading.value = false
 }
 
-// Toggle for Admin to view all
-const showAllCommits = ref(false)
-
 const fetchMyCommits = async () => {
     // Robust User ID Get
     const { data: { user: currentUser } } = await supabase.auth.getUser()
@@ -348,14 +395,14 @@ const fetchMyCommits = async () => {
         .from('fulfillments')
         .select(`
             *,
-            request:request_id(item),
-            center:collection_center_id(name),
-            user_profile:user_id(full_name, email)
+            request:requests!request_id(item),
+            center:collection_centers!collection_center_id(name),
+            user_profile:profiles!user_id(full_name, email, phone)
         `)
         .order('created_at', { ascending: false })
 
     // If NOT (Admin checking 'All'), filter by my ID
-    if (!isAdmin.value || !showAllCommits.value) {
+    if (activeTab.value === 'commits') {
         query = query.eq('user_id', currentUser.id)
     }
     
@@ -364,6 +411,49 @@ const fetchMyCommits = async () => {
     myCommits.value = data || []
     loadingCommits.value = false
     console.log('Commits fetched:', myCommits.value)
+}
+
+// HELPERS
+const isOverdue = (dateStr: string) => {
+    if (!dateStr) return false
+    const d = new Date(dateStr + 'T23:59:59')
+    return d < new Date()
+}
+
+const getWhatsAppLink = (commit: any) => {
+    const phone = commit.user_profile?.phone?.replace(/\D/g, '')
+    if (!phone) return '#'
+    // WhatsApp pre-filled template
+    const msg = encodeURIComponent(`Hola ${commit.user_profile.full_name}, te saludamos de CareLink. Vemos que tienes un compromiso pendiente para entregar ${commit.quantity} unidades de ${commit.request.item}. ¿Hay alguna novedad con la entrega?`)
+    return `https://wa.me/${phone}?text=${msg}`
+}
+
+const sendPushFollowUp = async (commit: any) => {
+    if (confirm(`¿Enviar recordatorio por App a ${commit.user_profile?.full_name || 'el donante'}?`)) {
+        try {
+            const res = await sendNotification({
+                title: '⏰ Recordatorio de Entrega',
+                body: `Hola, tienes una entrega pendiente de ${commit.request.item}. ¿Cuándo podrías traerla?`,
+                targetUserIds: [commit.user_id],
+                url: '/surtir'
+            })
+            if (res) alert('Aviso enviado.')
+        } catch (e: any) {
+            alert('Error al enviar: ' + e.message)
+        }
+    }
+}
+
+const markAsFulfilled = async (commit: any) => {
+    if (!confirm('¿Marcar este compromiso como ENTREGADO?')) return
+    
+    const { error } = await supabase.schema('app_carelink')
+        .from('fulfillments')
+        .update({ status: 'ENTREGADO', fulfilled_at: new Date().toISOString() })
+        .eq('id', commit.id)
+    
+    if (error) alert('Error: ' + error.message)
+    else await fetchMyCommits()
 }
 
 // ACTIONS
@@ -383,52 +473,59 @@ const saveCommitment = async () => {
     // Force get user ID just in case reactive 'user' is stale
     const { data: { user: currentUser } } = await supabase.auth.getUser()
     
-    if (!currentUser || !selectedReq.value) {
-        alert('Error: No se pudo identificar al usuario. Por favor recarga e inicia sesión.')
+    if (!currentUser || !selectedReq.value || !organizationId.value) {
+        alert('Error: No se pudo identificar al usuario o organización. Por favor recarga e inicia sesión.')
         return
     }
 
     submitting.value = true
     
-    // Explicitly construct payload with user_id
-    const payload = {
-        request_id: selectedReq.value.id,
-        user_id: currentUser.id, // CRITICAL FIX: Ensure this is not undefined
-        collection_center_id: form.collection_center_id,
-        quantity: form.quantity,
-        delivery_date: form.delivery_date,
-        status: 'PENDIENTE'
-    }
-
-    console.log('Sending payload:', payload)
-
-    const { error } = await supabase.schema('app_carelink')
-        .from('fulfillments')
-        .insert(payload)
-
-    if (error) {
-        alert('Error al guardar compromiso: ' + error.message)
-    } else {
-        // Notify Admins
-        try {
-            await notifyRequestCompromised(selectedReq.value.item,  profile.value?.full_name || 'Usuario')
-        } catch (pushErr) {
-            console.error('Push notification failed:', pushErr)
+    try {
+        // Explicitly construct payload with user_id and organization_id
+        const payload = {
+            organization_id: organizationId.value,
+            request_id: selectedReq.value.id,
+            user_id: currentUser.id, 
+            collection_center_id: form.collection_center_id,
+            quantity: form.quantity,
+            delivery_date: form.delivery_date,
+            status: 'PENDIENTE'
         }
 
-        alert('¡Compromiso registrado con éxito!')
-        showModal.value = false 
-        
-        // Refresh Lists
-        await Promise.all([
-            fetchData(),
-            fetchMyCommits()
-        ])
-        
-        // Switch tab
-        activeTab.value = 'commits'
+        console.log('Sending payload:', payload)
+
+        const { error } = await supabase.schema('app_carelink').from('fulfillments').insert(payload)
+
+        if (error) {
+            alert('Error al guardar compromiso: ' + error.message)
+        } else {
+            // Notify Admins
+            try {
+                if (notifyRequestCompromised) {
+                    await notifyRequestCompromised(selectedReq.value.item, profile.value?.full_name || 'Usuario')
+                }
+            } catch (pushErr) {
+                console.error('Push notification failed:', pushErr)
+            }
+
+            alert('¡Compromiso registrado con éxito!')
+            showModal.value = false 
+            
+            // Refresh Lists
+            await Promise.all([
+                fetchData(),
+                fetchMyCommits()
+            ])
+            
+            // Switch tab
+            activeTab.value = 'commits'
+        }
+    } catch (err: any) {
+        console.error('Unexpected error in saveCommitment:', err)
+        alert('Ocurrió un error inesperado: ' + err.message)
+    } finally {
+        submitting.value = false
     }
-    submitting.value = false
 }
 
 onMounted(() => {
@@ -436,7 +533,7 @@ onMounted(() => {
 })
 
 watch(activeTab, (val) => {
-    if (val === 'commits') fetchMyCommits()
+    if (val === 'commits' || val === 'allCommits') fetchMyCommits()
     else fetchData()
 })
 </script>
