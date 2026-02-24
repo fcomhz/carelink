@@ -148,10 +148,10 @@
                                      {{ c.status }}
                                  </span>
                                  <button v-if="isAdmin && c.status === 'PENDIENTE'" 
-                                    class="btn btn-link text-danger p-0 ms-2" 
-                                    @click="deleteCommitment(c)" 
+                                    class="btn btn-sm btn-light text-danger rounded-circle shadow-xs ms-2" 
+                                    @click="openDeleteCommitModal(c)" 
                                     title="Eliminar Compromiso">
-                                    <i class="fas fa-trash-alt"></i>
+                                    <i class="fas fa-trash"></i>
                                  </button>
                              </div>
                          </div>
@@ -222,8 +222,8 @@
                                          <button v-if="isAdmin" class="btn btn-xs btn-outline-success py-1" @click="markAsFulfilled(c)" title="Marcar como entregado">
                                              <i class="fas fa-check me-1"></i> Recibido
                                          </button>
-                                         <button v-if="isAdmin" class="btn btn-xs btn-outline-danger py-1" @click="deleteCommitment(c)" title="Eliminar Compromiso">
-                                             <i class="fas fa-trash me-1"></i>
+                                         <button v-if="isAdmin" class="btn btn-xs btn-outline-danger py-1" @click="openDeleteCommitModal(c)" title="Eliminar Compromiso">
+                                             <i class="fas fa-trash me-1"></i> Eliminar
                                          </button>
                                      </div>
                                  </div>
@@ -371,6 +371,35 @@
         </div>
     </div>
 
+    <!-- PREMIUM DELETE CONFIRMATION MODAL -->
+    <div v-if="commitToDelete" class="modal d-block" style="background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); z-index: 2100;" @click.self="commitToDelete = null">
+        <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
+            <div class="modal-content rounded-4 border-0 shadow-lg animate-up">
+                <div class="modal-body p-4 text-center">
+                    <div class="mb-4">
+                        <div class="bg-danger-subtle text-danger rounded-circle d-inline-flex align-items-center justify-content-center mb-3 shadow-sm" style="width: 70px; height: 70px;">
+                            <i class="fas fa-trash-alt fa-2x"></i>
+                        </div>
+                        <h5 class="fw-bold text-dark">¿Eliminar Compromiso?</h5>
+                        <p class="text-muted small px-2">
+                            Se eliminará el compromiso de surtir <strong>"{{ commitToDelete.request?.item }}"</strong>. 
+                            La cantidad volverá a estar disponible para que otros lo surtan.
+                        </p>
+                    </div>
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-danger py-2 fw-bold rounded-pill" @click="confirmDeleteCommitment" :disabled="submitting">
+                            <i v-if="submitting" class="spinner-border spinner-border-sm me-2"></i>
+                            {{ submitting ? 'Eliminando...' : 'Sí, Eliminar' }}
+                        </button>
+                        <button class="btn btn-light py-2 rounded-pill text-muted fw-bold" @click="commitToDelete = null" :disabled="submitting">
+                            Cancelar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
   </div>
 </template>
 
@@ -389,10 +418,10 @@ const centers = ref<any[]>([])
 const loading = ref(true)
 const loadingCommits = ref(false)
 
-// MODAL SURTIR STATE
 const showModal = ref(false)
 const submitting = ref(false)
 const selectedReq = ref<any>(null)
+const commitToDelete = ref<any>(null)
 const form = reactive({
     quantity: 1,
     collection_center_id: '',
@@ -503,17 +532,33 @@ const fetchMyCommits = async () => {
     console.log('Commits fetched:', myCommits.value)
 }
 
-const deleteCommitment = async (commit: any) => {
-    if (!isAdmin.value) return
-    if (!confirm(`¿Estás seguro de eliminar el compromiso de "${commit.request.item}"?`)) return
+const openDeleteCommitModal = (commit: any) => {
+    commitToDelete.value = commit
+}
+
+const confirmDeleteCommitment = async () => {
+    if (!commitToDelete.value || !isAdmin.value) return
+    submitting.value = true
     
-    const { error } = await supabase.schema('app_carelink')
-        .from('fulfillments')
-        .delete()
-        .eq('id', commit.id)
-    
-    if (error) alert('Error al eliminar: ' + error.message)
-    else await fetchMyCommits()
+    try {
+        const { error } = await supabase.schema('app_carelink')
+            .from('fulfillments')
+            .delete()
+            .eq('id', commitToDelete.value.id)
+        
+        if (error) throw error
+        
+        commitToDelete.value = null
+        await Promise.all([
+            fetchData(),
+            fetchMyCommits()
+        ])
+    } catch (e: any) {
+        console.error('Delete Commitment Error:', e)
+        alert('Error al eliminar: ' + (e.message || e.details || 'Error desconocido'))
+    } finally {
+        submitting.value = false
+    }
 }
 
 // HELPERS

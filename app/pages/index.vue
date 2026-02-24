@@ -45,13 +45,13 @@
                                         </small>
                                     </div>
                                 </div>
-                                <div v-if="isAdmin" class="dropdown">
-                                    <button class="btn btn-sm btn-link text-muted" type="button" data-bs-toggle="dropdown">
+                                <div v-if="isAdmin" class="dropdown position-relative">
+                                    <button class="btn btn-sm btn-link text-muted" type="button" @click="activeMenu = activeMenu === post.id ? null : post.id">
                                         <i class="fas fa-ellipsis-v"></i>
                                     </button>
-                                    <ul class="dropdown-menu dropdown-menu-end border-0 shadow">
-                                        <li><a class="dropdown-item" href="#" @click.prevent="editPost(post)"><i class="fas fa-edit me-2"></i>Editar</a></li>
-                                        <li><a class="dropdown-item text-danger" href="#" @click.prevent="deletePost(post.id)"><i class="fas fa-trash me-2"></i>Eliminar</a></li>
+                                    <ul v-if="activeMenu === post.id" class="dropdown-menu dropdown-menu-end border-0 shadow d-block show animate-up" style="position: absolute; right: 0; top: 100%; z-index: 1000;">
+                                        <li><a class="dropdown-item py-2" href="#" @click.prevent="editPost(post); activeMenu = null"><i class="fas fa-edit me-2 text-primary"></i>Editar</a></li>
+                                        <li><a class="dropdown-item py-2 text-danger" href="#" @click.prevent="openDeletePostModal(post); activeMenu = null"><i class="fas fa-trash me-2"></i>Eliminar</a></li>
                                     </ul>
                                 </div>
                             </div>
@@ -160,6 +160,34 @@
             </div>
         </div>
     </div>
+
+    <!-- PREMIUM DELETE CONFIRMATION MODAL -->
+    <div v-if="postToDelete" class="modal d-block" style="background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); z-index: 2000;" @click.self="postToDelete = null">
+        <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
+            <div class="modal-content rounded-4 border-0 shadow-lg animate-up">
+                <div class="modal-body p-4 text-center">
+                    <div class="mb-4">
+                        <div class="bg-danger-subtle text-danger rounded-circle d-inline-flex align-items-center justify-content-center mb-3 shadow-sm" style="width: 70px; height: 70px;">
+                            <i class="fas fa-trash-alt fa-2x"></i>
+                        </div>
+                        <h5 class="fw-bold text-dark">¿Eliminar Aviso?</h5>
+                        <p class="text-muted small px-2">
+                            Estás a punto de eliminar <strong>"{{ postToDelete.title }}"</strong>. 
+                        </p>
+                    </div>
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-danger py-2 fw-bold rounded-pill" @click="confirmDeletePost" :disabled="uploading">
+                            {{ uploading ? 'Eliminando...' : 'Eliminar Aviso' }}
+                        </button>
+                        <button class="btn btn-light py-2 rounded-pill text-muted fw-bold" @click="postToDelete = null" :disabled="uploading">
+                            Cancelar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
   </div>
 </template>
 
@@ -173,6 +201,8 @@ const posts = ref<any[]>([])
 const loading = ref(true)
 const uploading = ref(false)
 const showPostModal = ref(false)
+const activeMenu = ref<string | null>(null)
+const postToDelete = ref<any>(null)
 
 const postForm = reactive({
     id: null as string | null,
@@ -326,11 +356,23 @@ const savePost = async () => {
     }
 }
 
-const deletePost = async (id: string) => {
-    if (!confirm('¿Eliminar este aviso?')) return
-    const { error } = await supabase.from('announcements').delete().eq('id', id)
-    if (error) alert('Error: ' + error.message)
-    else await fetchPosts()
+const openDeletePostModal = (post: any) => {
+    postToDelete.value = post
+}
+
+const confirmDeletePost = async () => {
+    if (!postToDelete.value) return
+    uploading.value = true
+    try {
+        const { error } = await supabase.from('announcements').delete().eq('id', postToDelete.value.id)
+        if (error) throw error
+        postToDelete.value = null
+        await fetchPosts()
+    } catch (e: any) {
+        alert('Error: ' + e.message)
+    } finally {
+        uploading.value = false
+    }
 }
 
 onMounted(async () => {

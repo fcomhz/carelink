@@ -91,7 +91,7 @@
                                         <i class="fas fa-undo me-1"></i> Desaprobar
                                      </button>
 
-                                     <button class="btn btn-sm btn-light text-danger rounded-circle" 
+                                     <button class="btn btn-sm btn-light text-danger rounded-circle shadow-xs" 
                                         title="Eliminar Solicitud"
                                         @click="deleteRequest(req)">
                                         <i class="fas fa-trash"></i>
@@ -226,6 +226,39 @@
         </div>
     </div>
 
+    <!-- PREMIUM DELETE CONFIRMATION MODAL -->
+    <div v-if="requestToDelete" class="modal d-block" style="background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); z-index: 2100;" @click.self="requestToDelete = null">
+        <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
+            <div class="modal-content rounded-4 border-0 shadow-lg animate-up">
+                <div class="modal-body p-4 text-center">
+                    <div class="mb-4">
+                        <div class="bg-danger-subtle text-danger rounded-circle d-inline-flex align-items-center justify-content-center mb-3 shadow-sm" style="width: 70px; height: 70px;">
+                            <i class="fas fa-trash-alt fa-2x"></i>
+                        </div>
+                        <h5 class="fw-bold text-dark">¿Eliminar Solicitud?</h5>
+                        <p class="text-muted small px-2">
+                            Estás a punto de eliminar <strong>"{{ requestToDelete.item }}"</strong>. 
+                            Este proceso es irreversible.
+                        </p>
+                        <div v-if="requestToDelete.status === 'APROBADO'" class="alert alert-warning x-small border-0 py-2 mt-3 text-start">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            <strong>Nota:</strong> Esta solicitud ya está aprobada. Se eliminarán también todos los compromisos de surtido asociados.
+                        </div>
+                    </div>
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-danger py-2 fw-bold rounded-pill" @click="confirmDelete" :disabled="submitting">
+                            <i v-if="submitting" class="spinner-border spinner-border-sm me-2"></i>
+                            {{ submitting ? 'Eliminando...' : 'Sí, Eliminar Definitivamente' }}
+                        </button>
+                        <button class="btn btn-light py-2 rounded-pill text-muted fw-bold" @click="requestToDelete = null" :disabled="submitting">
+                            Cancelar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
   </div>
 </template>
 
@@ -249,6 +282,7 @@ const filterStatus = ref('ALL') // ALL, PENDING, APPROVED
 const isApproving = ref(false)
 const zoomImage = ref<string | null>(null)
 const newCategoryName = ref('')
+const requestToDelete = ref<any>(null)
 
 // Form State
 const form = reactive({
@@ -547,21 +581,35 @@ const viewImage = (url: string) => {
     zoomImage.value = url
 }
 
-const deleteRequest = async (req: any) => {
-    if (!confirm('¿Estás seguro de eliminar esta solicitud? Si ya tiene surtidos asociados, podría causar errores.')) return
+const deleteRequest = (req: any) => {
+    requestToDelete.value = req
+}
 
+const confirmDelete = async () => {
+    if (!requestToDelete.value) return
+    submitting.value = true
     try {
         const { error } = await supabase.schema('app_carelink')
             .from('requests')
             .delete()
-            .eq('id', req.id)
+            .eq('id', requestToDelete.value.id)
         
-        if (error) throw error
+        if (error) {
+            // Check for potential conflict if cascade fix failed (it shouldn't, but safety first)
+            if (error.code === '23503') {
+                throw new Error('No se puede eliminar porque existen registros dependientes. Por favor contacta soporte.')
+            }
+            throw error
+        }
         
-        alert('Solicitud eliminada.')
+        requestToDelete.value = null
         await fetchMetadata()
+        // Success notification or sound? Small toast?
     } catch (e: any) {
-        alert('Error: ' + e.message)
+        console.error('Delete Request Error:', e)
+        alert('Error al eliminar: ' + (e.message || e.details || 'Error desconocido'))
+    } finally {
+        submitting.value = false
     }
 }
 
