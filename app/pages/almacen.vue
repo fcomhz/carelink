@@ -11,6 +11,9 @@
                 </div>
                 <!-- Action Buttons -->
                 <div class="d-flex gap-2">
+                    <button class="btn btn-warning rounded-pill shadow-sm fw-bold" @click="openAuditModal" :disabled="items.length === 0">
+                        <i class="fas fa-clipboard-check me-1"></i> Inventario Físico
+                    </button>
                     <button class="btn btn-outline-danger rounded-pill shadow-sm" @click="openConsumeModal" :disabled="items.length === 0">
                         <i class="fas fa-minus-circle me-1"></i> Registrar Salida
                     </button>
@@ -230,6 +233,7 @@ const loading = ref(true)
 const submitting = ref(false)
 const showConsumeModal = ref(false)
 const showAdjustModal = ref(false)
+const showAuditModal = ref(false)
 
 // Forms
 const form = reactive({
@@ -238,6 +242,12 @@ const form = reactive({
     notes: ''
 })
 const maxQty = ref(1000)
+
+const auditForm = reactive({
+    item_id: '',
+    physical_quantity: 0,
+    notes: ''
+})
 
 const adjustForm = reactive({
     id: null as string | null,
@@ -250,6 +260,12 @@ const editModeItem = ref<any>(null)
 
 // Computed
 const lowStockItems = computed(() => items.value.filter(i => i.quantity <= i.min_stock))
+
+const auditDiff = computed(() => {
+    if (!auditForm.item_id) return 0
+    const item = items.value.find(i => i.id === auditForm.item_id)
+    return item ? auditForm.physical_quantity - item.quantity : 0
+})
 
 // FETCH
 const fetchInventory = async () => {
@@ -401,6 +417,54 @@ const handleAdjust = async () => {
 
     } catch (e: any) {
         console.error(e)
+        alert('Error: ' + e.message)
+    } finally {
+        submitting.value = false
+    }
+}
+
+// AUDIT LOGIC
+const openAuditModal = () => {
+    auditForm.item_id = ''
+    auditForm.physical_quantity = 0
+    auditForm.notes = ''
+    showAuditModal.value = true
+}
+
+const handleAudit = async () => {
+    submitting.value = true
+    try {
+        const item = items.value.find(i => i.id === auditForm.item_id)
+        if (!item) return
+
+        const diff = auditDiff.value
+        if (diff === 0 && !confirm('La cantidad física coincide con el sistema. ¿Deseas registrar la auditoría de todos modos?')) {
+            submitting.value = false
+            return
+        }
+
+        // 1. Transaction
+        const { error: tErr } = await supabase.schema('app_carelink').from('inventory_transactions').insert({
+            organization_id: organizationId.value,
+            item_id: auditForm.item_id,
+            type: 'ADJUST',
+            quantity: Math.abs(diff) || 0,
+            performed_by: profile.value.id,
+            notes: `Inventario Físico: ${auditForm.notes || 'Ajuste de auditoría'}. Diferencia: ${diff}`
+        })
+        if (tErr) throw tErr
+
+        // 2. Update Item Quantity
+        const { error: iErr } = await supabase.schema('app_carelink').from('inventory_items')
+            .update({ quantity: auditForm.physical_quantity, last_updated: new Date().toISOString() })
+            .eq('id', auditForm.item_id)
+        if (iErr) throw iErr
+
+        await fetchInventory()
+        showAuditModal.value = false
+        alert('Inventario físico actualizado correctamente.')
+
+    } catch (e: any) {
         alert('Error: ' + e.message)
     } finally {
         submitting.value = false

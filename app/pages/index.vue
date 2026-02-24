@@ -50,6 +50,7 @@
                                         <i class="fas fa-ellipsis-v"></i>
                                     </button>
                                     <ul class="dropdown-menu dropdown-menu-end border-0 shadow">
+                                        <li><a class="dropdown-item" href="#" @click.prevent="editPost(post)"><i class="fas fa-edit me-2"></i>Editar</a></li>
                                         <li><a class="dropdown-item text-danger" href="#" @click.prevent="deletePost(post.id)"><i class="fas fa-trash me-2"></i>Eliminar</a></li>
                                     </ul>
                                 </div>
@@ -85,7 +86,7 @@
         <div class="modal-dialog modal-dialog-centered modal-lg">
             <div class="modal-content rounded-4 border-0 shadow">
                 <div class="modal-header border-0 pb-0">
-                    <h5 class="fw-bold">Nuevo Aviso</h5>
+                    <h5 class="fw-bold">{{ postForm.id ? 'Editar Aviso' : 'Nuevo Aviso' }}</h5>
                     <button type="button" class="btn-close" @click="showPostModal = false"></button>
                 </div>
                 <div class="modal-body">
@@ -108,6 +109,14 @@
                                     <select v-model="postForm.priority" class="form-select bg-light border-0">
                                         <option value="REGULAR">Regular</option>
                                         <option value="URGENTE">Urgente</option>
+                                    </select>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label small text-muted">Estado</label>
+                                    <select v-model="postForm.status" class="form-select bg-light border-0">
+                                        <option value="ACTIVO">Activo (Visible)</option>
+                                        <option value="INACTIVO">Inactivo (Oculto)</option>
                                     </select>
                                 </div>
 
@@ -143,7 +152,7 @@
         
                         <div class="d-grid mt-3">
                             <button type="submit" class="btn btn-teal py-2 rounded-3" :disabled="uploading">
-                                {{ uploading ? 'Publicando...' : 'Publicar Aviso' }}
+                                {{ uploading ? 'Guardando...' : (postForm.id ? 'Guardar Cambios' : 'Publicar Aviso') }}
                             </button>
                         </div>
                     </form>
@@ -156,6 +165,7 @@
 
 <script setup lang="ts">
 const { profile, organizationId, fetchProfile } = useOrganization()
+const { notifyNewAnnouncement } = usePushNotificationSender()
 const supabase = useSupabaseClient()
 
 // State
@@ -165,12 +175,14 @@ const uploading = ref(false)
 const showPostModal = ref(false)
 
 const postForm = reactive({
+    id: null as string | null,
     title: '',
     body: '',
     audience_role: 'TODOS',
     priority: 'REGULAR',
     status: 'ACTIVO',
     imageFile: null as File | null,
+    imageUrl: null as string | null,
     links: [] as { title: string, url: string }[]
 })
 const imagePreview = ref<string | null>(null)
@@ -201,15 +213,33 @@ const fetchPosts = async () => {
 const openPostModal = () => {
     // Reset Form
     Object.assign(postForm, {
+        id: null,
         title: '',
         body: '',
         audience_role: 'TODOS',
         priority: 'REGULAR',
         status: 'ACTIVO',
         imageFile: null,
+        imageUrl: null,
         links: []
     })
     imagePreview.value = null
+    showPostModal.value = true
+}
+
+const editPost = (post: any) => {
+    Object.assign(postForm, {
+        id: post.id,
+        title: post.title,
+        body: post.body,
+        audience_role: post.audience_role,
+        priority: post.priority,
+        status: post.status,
+        imageFile: null,
+        imageUrl: post.image_url,
+        links: JSON.parse(JSON.stringify(post.related_links || []))
+    })
+    imagePreview.value = post.image_url
     showPostModal.value = true
 }
 
@@ -238,7 +268,7 @@ const savePost = async () => {
     if (!profile.value?.id || !organizationId.value) return
     uploading.value = true
 
-    let imageUrl = null
+    let imageUrl = postForm.imageUrl
 
     try {
         // Filter empty links
@@ -262,8 +292,8 @@ const savePost = async () => {
             imageUrl = publicData.publicUrl
         }
 
-        // 2. Insert Post with Links Link (JSONB)
-        const { error } = await supabase.from('announcements').insert({
+        // 2. Upsert Post
+        const postData: any = {
             organization_id: organizationId.value,
             title: postForm.title,
             body: postForm.body,
@@ -273,9 +303,18 @@ const savePost = async () => {
             image_url: imageUrl,
             author_id: profile.value.id,
             related_links: validLinks
-        })
+        }
+
+        if (postForm.id) postData.id = postForm.id
+
+        const { error } = await supabase.from('announcements').upsert(postData)
 
         if (error) throw error
+
+        // 3. Notify if new post and active
+        if (!postForm.id && postForm.status === 'ACTIVO') {
+            await notifyNewAnnouncement(postForm.title)
+        }
 
         showPostModal.value = false
         await fetchPosts()

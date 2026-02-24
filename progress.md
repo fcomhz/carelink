@@ -1,5 +1,40 @@
 # Progreso del Proyecto CareLink
 
+## 🟢 Sesión: Surtir, Notificaciones y Avisos (20 Feb 2026 - Tarde)
+
+### 1. 📦 Módulo Surtir (Transparencia)
+- **Detalle de Necesidad**: Las tarjetas de compromisos (tanto en vista usuario como admin) ahora muestran el **Proveedor Sugerido** y los **Comentarios** de la solicitud original.
+- **Contexto**: Facilita a los donantes saber exactamente qué comprar y dónde, sin tener que navegar hacia atrás.
+
+### 2. 📢 Gestión de Tablero (Avisos)
+- **Control Total**: Implementada la capacidad de **Editar** avisos existentes.
+- **Ciclo de Vida**: Añadido selector de estado **Activo / Inactivo** para ocultar avisos sin borrarlos.
+- **Limpieza**: Opción de eliminación funcional con confirmación.
+
+### 3. 🔔 Notificaciones Inteligentes
+- **Automatización**: Al publicar un nuevo aviso activo, el sistema dispara automáticamente una **Notificación Push** a todos los usuarios de la organización.
+- **Estabilidad**: Corregido bug que impedía el registro de nuevas suscripciones en dispositivos móviles.
+
+---
+
+## 🟢 Sesión: Unificación de Proyectos y Estabilización (20 Feb 2026)
+
+### 1. 🚀 Unificación de Vercel
+- **Migración Exitosa**: Se consolidó la versión final de la WebApp en el proyecto `carelink` ([gabymartinez.vercel.app](https://gabymartinez.vercel.app)).
+- **Limpieza de Infraestructura**: El proyecto redundante `carelink-web` fue eliminado para evitar confusiones de versiones.
+- **Sincronización Git**: Repositorio local y remoto (GitHub) alineados en el commit `a22b28f`.
+
+### 2. 🛠️ Estabilización Local (Localhost)
+- **Reparación de Acceso**: Resuelto problema de login en `localhost:3000`.
+- **Limpieza Técnica**: Purga de caché de Nuxt (`.nuxt`, `.output`) y corrección de variables de entorno en `.env`.
+
+### 3. 🔔 Notificaciones Push (VAPID & DB Fix)
+- **Restauración de Servicio**: Regeneración de llaves VAPID perdidas durante el cambio de proyecto.
+- **Configuración Cloud**: Llaves configuradas en el entorno seguro de Vercel e integración recuperada en producción.
+- **Integridad de BD**: Corregido error "ON CONFLICT" mediante la adición de una restricción `UNIQUE` en la tabla `push_subscriptions`.
+
+---
+
 ## 🟢 Sesión: Finanzas Pro y Seguimiento de Compromisos (19 Feb 2026)
 
 ### 1. 🛡️ Estabilidad y Sesiones (Ghost Sessions)

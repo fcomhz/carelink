@@ -8,6 +8,11 @@
                    <h5 class="text-teal fw-bold mb-0"><i class="fas fa-boxes me-2"></i>ENTRADAS DE ALMACÉN</h5>
                    <small class="text-muted">Valida la recepción de insumos y registra donativos.</small>
                 </div>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-warning rounded-pill px-4 fw-bold shadow-sm" @click="openDirectDonationModal">
+                        <i class="fas fa-hand-holding-heart me-1"></i> Donación Directa
+                    </button>
+                </div>
             </div>
 
             <!-- Tabs -->
@@ -144,6 +149,62 @@
             </div>
         </div>
     </div>
+
+    <!-- MODAL DIRECT DONATION -->
+    <div v-if="showDirectModal" class="modal d-block" style="background: rgba(0,0,0,0.5)">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow rounded-4">
+                <div class="modal-header border-0 bg-warning text-dark rounded-top-4">
+                    <h5 class="fw-bold mb-0"><i class="fas fa-hand-holding-heart me-2"></i>Registrar Donación Directa</h5>
+                    <button type="button" class="btn-close" @click="showDirectModal = false"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <form @submit.prevent="handleDirectDonation">
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold text-muted">¿Qué se donó? (Nombre del Item)</label>
+                            <input v-model="directForm.item_name" class="form-control" placeholder="Ej. Pañales Etapa 3" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold text-muted">Aportante (Nombre)</label>
+                            <input v-model="directForm.donor_name" class="form-control" placeholder="Ej. Juan Pérez (Opcional)">
+                        </div>
+                        <div class="row">
+                            <div class="col-6 mb-3">
+                                <label class="form-label small fw-bold text-muted">Cantidad</label>
+                                <input type="number" v-model="directForm.quantity" class="form-control" min="1" required>
+                            </div>
+                            <div class="col-6 mb-3">
+                                <label class="form-label small fw-bold text-muted">Costo Unitario (Est.)</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" v-model="directForm.unit_price" class="form-control" min="0" step="0.01">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold text-muted">Categoría</label>
+                            <select v-model="directForm.category_id" class="form-select">
+                                <option value="">Sin categoría...</option>
+                                <option v-for="cat in categories" :key="cat.id" :value="cat.id">{{ cat.name }}</option>
+                            </select>
+                        </div>
+                        <div class="form-check mb-4">
+                             <input class="form-check-input" type="checkbox" v-model="directForm.register_finance" id="chkDirectFin">
+                             <label class="form-check-label small" for="chkDirectFin">
+                                 Registrar en Finanzas (Donativo Especie)
+                             </label>
+                        </div>
+                        <div class="d-flex justify-content-end gap-2">
+                             <button type="button" class="btn btn-light" @click="showDirectModal = false">Cancelar</button>
+                             <button type="submit" class="btn btn-warning px-4 fw-bold" :disabled="submitting">
+                                 Registrar Donación
+                             </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
   </div>
 </template>
 
@@ -159,6 +220,8 @@ const submitting = ref(false)
 const showModal = ref(false)
 
 const list = ref<any[]>([])
+const categories = ref<any[]>([])
+const showDirectModal = ref(false)
 
 // Form
 const form = reactive({
@@ -168,6 +231,15 @@ const form = reactive({
     unit_price: 0,
     request_id: '',
     sponsor_name: '',
+    register_finance: true
+})
+
+const directForm = reactive({
+    item_name: '',
+    donor_name: '',
+    quantity: 1,
+    unit_price: 0,
+    category_id: '',
     register_finance: true
 })
 
@@ -190,7 +262,93 @@ const fetchData = async () => {
     
     if (error) console.error(error)
     list.value = data || []
+
+    // Fetch Categories for direct donation
+    const { data: catData } = await supabase.schema('app_carelink').from('categories').select('*').order('name')
+    categories.value = catData || []
+
     loading.value = false
+}
+
+const openDirectDonationModal = () => {
+    directForm.item_name = ''
+    directForm.donor_name = ''
+    directForm.quantity = 1
+    directForm.unit_price = 0
+    directForm.category_id = ''
+    directForm.register_finance = true
+    showDirectModal.value = true
+}
+
+const handleDirectDonation = async () => {
+    submitting.value = true
+    try {
+        const totalAmount = directForm.quantity * directForm.unit_price
+
+        // 1. Check/Update Inventory
+        let itemId = null
+        const { data: existingItem } = await supabase.schema('app_carelink')
+            .from('inventory_items')
+            .select('id, quantity')
+            .eq('name', directForm.item_name)
+            .eq('organization_id', organizationId.value)
+            .maybeSingle()
+
+        if (existingItem) {
+            itemId = existingItem.id
+            const { error: upErr } = await supabase.schema('app_carelink')
+                .from('inventory_items')
+                .update({ quantity: Number(existingItem.quantity) + Number(directForm.quantity) })
+                .eq('id', itemId)
+            if (upErr) throw upErr
+        } else {
+            const { data: newItem, error: crErr } = await supabase.schema('app_carelink')
+                .from('inventory_items')
+                .insert({
+                    organization_id: organizationId.value,
+                    name: directForm.item_name,
+                    quantity: directForm.quantity,
+                    min_stock: 5,
+                    location: 'Recepción',
+                    category_id: directForm.category_id || null
+                })
+                .select()
+                .single()
+            if (crErr) throw crErr
+            itemId = newItem.id
+        }
+
+        // 2. Register Transaction
+        await supabase.schema('app_carelink').from('inventory_transactions').insert({
+            organization_id: organizationId.value,
+            item_id: itemId,
+            type: 'IN',
+            quantity: directForm.quantity,
+            performed_by: profile.value.id,
+            notes: `Donación Directa (Aportante: ${directForm.donor_name || 'Anónimo'})`
+        })
+
+        // 3. Register Finance
+        if (directForm.register_finance && totalAmount > 0) {
+            await supabase.schema('app_carelink').from('finance_records').insert({
+                organization_id: organizationId.value,
+                date_occurred: new Date().toISOString().split('T')[0],
+                concept: `Donativo Directo: ${directForm.item_name} (x${directForm.quantity}) - ${directForm.donor_name || 'Anónimo'}`,
+                amount: totalAmount,
+                category: 'Donativo en Especie',
+                type: 'IN',
+                recorded_by: profile.value.id
+            })
+        }
+
+        alert('¡Donación registrada con éxito!')
+        showDirectModal.value = false
+        await fetchData()
+    } catch (e: any) {
+        alert('Error: ' + e.message)
+    } finally {
+        submitting.value = false
+    }
 }
 
 const openValidateModal = (item: any) => {

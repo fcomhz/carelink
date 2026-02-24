@@ -38,6 +38,13 @@
                 Compromisos Pendientes
             </button>
         </li>
+        <li v-if="isAdmin" class="nav-item">
+            <button class="nav-link rounded-pill px-4" 
+                :class="{ active: activeTab === 'history' }"
+                @click="activeTab = 'history'">
+                Historial (Admin)
+            </button>
+        </li>
     </ul>
 
     <div class="tab-content">
@@ -126,6 +133,12 @@
                                      <span class="mx-1">|</span>
                                      Entrega: {{ c.delivery_date || 'Sin fecha' }}
                                  </div>
+                                 <div v-if="c.request.suggested_provider" class="x-small text-muted mt-1">
+                                     <i class="fas fa-store me-1"></i> Proveedor: {{ c.request.suggested_provider }}
+                                 </div>
+                                 <div v-if="c.request.comments" class="x-small text-muted fst-italic mt-1 border-start border-2 border-teal ps-2">
+                                     "{{ c.request.comments }}"
+                                 </div>
                                  <div class="x-small text-muted mt-1">
                                      <i class="fas fa-map-marker-alt me-1"></i> {{ c.center?.name || 'Centro no especificado' }}
                                  </div>
@@ -134,6 +147,12 @@
                                  <span :class="['badge', c.status === 'PENDIENTE' ? 'bg-warning text-dark' : 'bg-success']">
                                      {{ c.status }}
                                  </span>
+                                 <button v-if="isAdmin && c.status === 'PENDIENTE'" 
+                                    class="btn btn-link text-danger p-0 ms-2" 
+                                    @click="deleteCommitment(c)" 
+                                    title="Eliminar Compromiso">
+                                    <i class="fas fa-trash-alt"></i>
+                                 </button>
                              </div>
                          </div>
                      </div>
@@ -163,17 +182,32 @@
                                      <strong class="text-dark">{{ c.request.item }}</strong>
                                      <span class="badge bg-light text-muted border small">{{ c.quantity }} uds</span>
                                  </div>
-                                 <div class="small mb-1">
+                                  <div class="small mb-1">
                                     <span class="text-muted">Donante:</span> 
                                     <strong class="text-teal ms-1">{{ c.user_profile?.full_name || c.user_profile?.email || 'Anónimo' }}</strong>
-                                    <a v-if="c.user_profile?.phone" :href="getWhatsAppLink(c)" target="_blank" class="ms-2 text-success" title="Enviar WhatsApp">
-                                        <i class="fab fa-whatsapp"></i>
-                                    </a>
-                                 </div>
+                                    <!-- Semiautomatic WhatsApp Menu -->
+                                    <div v-if="c.user_profile?.phone" class="btn-group ms-2">
+                                        <button class="btn btn-xs btn-outline-success dropdown-toggle py-0 px-1" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                            <i class="fab fa-whatsapp"></i>
+                                        </button>
+                                        <ul class="dropdown-menu shadow-sm">
+                                            <li><a class="dropdown-item small" href="#" @click.prevent="openWhatsApp(c, 'GENTLE')">Recordatorio Amable</a></li>
+                                            <li><a class="dropdown-item small" href="#" @click.prevent="openWhatsApp(c, 'URGENT')">Recordatorio Urgente</a></li>
+                                            <li><a class="dropdown-item small" href="#" @click.prevent="openWhatsApp(c, 'DIRECT')">Mensaje Directo</a></li>
+                                        </ul>
+                                    </div>
+                                  </div>
                                  <div class="x-small" :class="isOverdue(c.delivery_date) && c.status === 'PENDIENTE' ? 'text-danger fw-bold' : 'text-muted'">
                                      <i class="far fa-calendar-alt me-1"></i> 
                                      Entrega: {{ c.delivery_date || 'Sin fecha' }}
                                      <span v-if="isOverdue(c.delivery_date) && c.status === 'PENDIENTE'" class="ms-1">(VENCIDO)</span>
+                                 </div>
+                                 <!-- Admin view: Provider and Comments -->
+                                 <div v-if="c.request.suggested_provider" class="x-small text-muted mt-1">
+                                     <i class="fas fa-store me-1"></i> Proveedor: {{ c.request.suggested_provider }}
+                                 </div>
+                                 <div v-if="c.request.comments" class="x-small text-muted fst-italic mt-1 border-start border-2 border-teal ps-2">
+                                     "{{ c.request.comments }}"
                                  </div>
                              </div>
                              <div class="col-md-5 text-md-end mt-2 mt-md-0">
@@ -181,12 +215,15 @@
                                      <span :class="['badge', c.status === 'PENDIENTE' ? 'bg-warning text-dark' : 'bg-success']">
                                          {{ c.status === 'PENDIENTE' ? 'PENDIENTE' : 'ENTREGADO' }}
                                      </span>
-                                     <div class="d-flex gap-1" v-if="c.status === 'PENDIENTE'">
+                                      <div class="d-flex gap-1" v-if="c.status === 'PENDIENTE'">
                                          <button class="btn btn-xs btn-outline-teal py-1" @click="sendPushFollowUp(c)" title="Recordatorio por App">
                                              <i class="fas fa-bell me-1"></i> Aviso App
                                          </button>
                                          <button v-if="isAdmin" class="btn btn-xs btn-outline-success py-1" @click="markAsFulfilled(c)" title="Marcar como entregado">
                                              <i class="fas fa-check me-1"></i> Recibido
+                                         </button>
+                                         <button v-if="isAdmin" class="btn btn-xs btn-outline-danger py-1" @click="deleteCommitment(c)" title="Eliminar Compromiso">
+                                             <i class="fas fa-trash me-1"></i>
                                          </button>
                                      </div>
                                  </div>
@@ -197,6 +234,46 @@
                  <div v-if="myCommits.length === 0" class="text-center py-5 text-muted">
                     <p>No hay compromisos registrados en el sistema.</p>
                 </div>
+            </div>
+        </div>
+
+        <!-- TAB 4: HISTORY (Admin Only) -->
+        <div v-if="activeTab === 'history' && isAdmin" class="fade show active">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="fw-bold text-muted mb-0 small uppercase">Historial de Pedidos Surtidos</h6>
+                <span class="badge bg-light text-dark border">Total: {{ myCommits.length }}</span>
+            </div>
+
+            <div v-if="loadingCommits" class="text-center py-5">
+                <div class="spinner-border text-teal" role="status"></div>
+            </div>
+            <div v-else class="table-responsive bg-white rounded-3 shadow-sm">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="bg-light">
+                        <tr class="x-small text-muted uppercase">
+                            <th class="ps-3">Item</th>
+                            <th>Donante</th>
+                            <th>Cant.</th>
+                            <th>Surtido el</th>
+                            <th>Recibido por</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="c in myCommits" :key="c.id" class="small">
+                            <td class="ps-3 fw-bold">{{ c.request.item }}</td>
+                            <td>
+                                <div>{{ c.user_profile?.full_name || 'Anónimo' }}</div>
+                                <div class="x-small text-muted">{{ c.user_profile?.email }}</div>
+                            </td>
+                            <td><span class="badge bg-success-subtle text-success">{{ c.quantity }} uds</span></td>
+                            <td>{{ c.received_at ? new Date(c.received_at).toLocaleDateString() : '?' }}</td>
+                            <td>{{ c.receiver?.full_name || 'Sistema' }}</td>
+                        </tr>
+                        <tr v-if="myCommits.length === 0">
+                            <td colspan="5" class="text-center py-5 text-muted">Aún no hay historial de entregas.</td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
@@ -395,7 +472,7 @@ const fetchMyCommits = async () => {
         .from('fulfillments')
         .select(`
             *,
-            request:requests!request_id(item),
+            request:requests!request_id(item, suggested_provider, comments),
             center:collection_centers!collection_center_id(name),
             user_profile:profiles!user_id(full_name, email, phone)
         `)
@@ -403,7 +480,20 @@ const fetchMyCommits = async () => {
 
     // If NOT (Admin checking 'All'), filter by my ID
     if (activeTab.value === 'commits') {
-        query = query.eq('user_id', currentUser.id)
+        query = query.eq('user_id', currentUser.id).neq('status', 'ENTREGADO')
+    } else if (activeTab.value === 'allCommits') {
+        query = query.eq('status', 'PENDIENTE')
+    } else if (activeTab.value === 'history') {
+        query = supabase.schema('app_carelink')
+            .from('fulfillments')
+            .select(`
+                *,
+                request:requests!request_id(item),
+                user_profile:profiles!user_id(full_name, email),
+                receiver:profiles!received_by(full_name)
+            `)
+            .eq('status', 'ENTREGADO')
+            .order('received_at', { ascending: false })
     }
     
     const { data } = await query
@@ -413,6 +503,19 @@ const fetchMyCommits = async () => {
     console.log('Commits fetched:', myCommits.value)
 }
 
+const deleteCommitment = async (commit: any) => {
+    if (!isAdmin.value) return
+    if (!confirm(`¿Estás seguro de eliminar el compromiso de "${commit.request.item}"?`)) return
+    
+    const { error } = await supabase.schema('app_carelink')
+        .from('fulfillments')
+        .delete()
+        .eq('id', commit.id)
+    
+    if (error) alert('Error al eliminar: ' + error.message)
+    else await fetchMyCommits()
+}
+
 // HELPERS
 const isOverdue = (dateStr: string) => {
     if (!dateStr) return false
@@ -420,12 +523,28 @@ const isOverdue = (dateStr: string) => {
     return d < new Date()
 }
 
-const getWhatsAppLink = (commit: any) => {
+const openWhatsApp = (commit: any, type: 'GENTLE' | 'URGENT' | 'DIRECT' = 'GENTLE') => {
     const phone = commit.user_profile?.phone?.replace(/\D/g, '')
-    if (!phone) return '#'
-    // WhatsApp pre-filled template
-    const msg = encodeURIComponent(`Hola ${commit.user_profile.full_name}, te saludamos de CareLink. Vemos que tienes un compromiso pendiente para entregar ${commit.quantity} unidades de ${commit.request.item}. ¿Hay alguna novedad con la entrega?`)
-    return `https://wa.me/${phone}?text=${msg}`
+    if (!phone) {
+        alert('Este usuario no tiene teléfono registrado.')
+        return
+    }
+    
+    let msg = ''
+    const name = commit.user_profile.full_name || 'Donante'
+    const item = commit.request.item
+    const qty = commit.quantity
+
+    if (type === 'GENTLE') {
+        msg = `Hola ${name}, te saludamos de CareLink. 🌟 Te escribimos para dar seguimiento a tu generoso compromiso de surtir ${qty} unidades de ${item}. ¿Tendrás alguna actualización sobre la fecha de entrega? ¡Gracias por tu apoyo!`
+    } else if (type === 'URGENT') {
+        msg = `Hola ${name}, de CareLink. ⏰ Tenemos el compromiso pendiente de ${qty} unidades de ${item} y lo necesitamos pronto para los pacientes. ¿Será posible que lo traigas en estos días? Quedamos atentos.`
+    } else {
+        msg = `Hola ${name}, te contacto de CareLink sobre la donación pendiente de ${item}.`
+    }
+
+    const url = `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`
+    window.open(url, '_blank')
 }
 
 const sendPushFollowUp = async (commit: any) => {
@@ -449,7 +568,7 @@ const markAsFulfilled = async (commit: any) => {
     
     const { error } = await supabase.schema('app_carelink')
         .from('fulfillments')
-        .update({ status: 'ENTREGADO', fulfilled_at: new Date().toISOString() })
+        .update({ status: 'ENTREGADO', received_at: new Date().toISOString(), received_by: profile.value.id })
         .eq('id', commit.id)
     
     if (error) alert('Error: ' + error.message)
@@ -533,7 +652,7 @@ onMounted(() => {
 })
 
 watch(activeTab, (val) => {
-    if (val === 'commits' || val === 'allCommits') fetchMyCommits()
+    if (val === 'commits' || val === 'allCommits' || val === 'history') fetchMyCommits()
     else fetchData()
 })
 </script>
