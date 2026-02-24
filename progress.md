@@ -1,5 +1,27 @@
 # Progreso del Proyecto CareLink
 
+## 🟢 Sesión: UX Premium, Integridad de Datos y Gestión de Inventario (24 Feb 2026 - Tarde)
+
+### 1. 🎨 UX Premium (Modales de Confirmación)
+- **Eliminación Segura**: Implementación de **Modales Premium** con estética nubliTI (fondos desenfocados, iconografía roja y mensajes de advertencia claros) en las secciones de **Pedidos**, **Surtir**, **Inicio** y **Almacén**.
+- **Adiós a los Diálogos Nativos**: Se reemplazó el `confirm()` básico del navegador por una experiencia visualmente integrada y profesional.
+- **Advertencias Inteligentes**: El modal de eliminación de pedidos detecta si existen compromisos activos y advierte al administrador sobre la limpieza en cascada.
+
+### 2. 📦 Almacén e Inventario (Admin Control)
+- **Borrado de Insumos**: Nueva capacidad para administradores de eliminar ítems del inventario directamente desde la tabla de Almacén.
+- **Integridad Referencial**: Corregido problema estructural en la tabla `inventory_items` (falta de PK explícita) y configurado el borrado en cascada para su historial de movimientos.
+
+### 3. 🛠️ Robustez del Tablero (Home)
+- **Menús Dinámicos**: Migración del menú de "tres puntos" en anuncios de Bootstrap nativo a **Vue State Control**. Esto garantiza que los menús sean 100% funcionales en dispositivos móviles y entornos SPA sin errores de inicialización de JS.
+
+### 4. 🗄️ Base de Datos e Integridad
+- **Fix Cascada (Global)**: Aplicación de scripts SQL para asegurar que la eliminación de registros principales (Pedidos, Insumos) no se vea bloqueada por conflictos de llave foránea, manteniendo la base de datos limpia.
+
+### 5. 🚀 Despliegue
+- **Sincronización Total**: Todos los cambios de UI y lógica de base de datos han sido desplegados exitosamente en el entorno de producción de Vercel.
+
+---
+
 ## 🟢 Sesión: Interactividad, Inventario Físico y Logística Admin (24 Feb 2026)
 
 ### 1. 🛠️ Interactividad y UX (Bootstrap Fix)
