@@ -1,5 +1,26 @@
 # Progreso del Proyecto CareLink
 
+## 🟢 Sesión: Interactividad, Inventario Físico y Logística Admin (24 Feb 2026)
+
+### 1. 🛠️ Interactividad y UX (Bootstrap Fix)
+- **Plugin de Bootstrap JS**: Se integró `bootstrap.client.ts` para habilitar la lógica nativa de Bootstrap 5 en Nuxt. Esto resolvió que los menús de tres puntos (dropdowns) y modales no respondieran al clic.
+- **Corrección de Errores Críticos**: Reparados los botones de eliminación en **Inicio**, **Pedidos** y **Surtir** que estaban inoperantes por falta de interactividad/permisos.
+
+### 2. 📦 Gestión de Inventario y Almacén
+- **Donación Directa**: Nuevo botón en `/entradas` para registrar ingresos de insumos que no vienen de una solicitud previa. Integra automáticamente inventario y valor financiero.
+- **Inventario Físico (Auditoría)**: Nueva funcionalidad en `/almacen` para realizar conteos físicos. El sistema calcula la diferencia contra el stock digital y genera ajustes automáticos.
+
+### 3. 🤝 Logística de Surtido (Admin)
+- **Historial de Entregas**: Nueva pestaña **"Historial (Admin)"** en `/surtir` para consultar todas las donaciones ya recibidas (quién entregó, qué, cuánto y quién recibió).
+- **Plantillas de WhatsApp**: Menú desplegable con 3 mensajes predefinidos (Amable, Urgente, Directo) para agilizar el seguimiento de compromisos pendientes.
+- **Integridad de Borrado**: Corregida restricción de base de datos (`ON DELETE CASCADE`) que impedía borrar solicitudes con compromisos asociados.
+
+### 4. 🚀 Despliegue y Verificación
+- **Localhost 100%**: Verificación completa de flujo de administrador en entorno local.
+- **Vercel Sync**: Sincronización exitosa de todos los cambios con el entorno de producción en Vercel.
+
+---
+
 ## 🟢 Sesión: Surtir, Notificaciones y Avisos (20 Feb 2026 - Tarde)
 
 ### 1. 📦 Módulo Surtir (Transparencia)
