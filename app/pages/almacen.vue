@@ -79,6 +79,9 @@
                                         <button v-if="isAdmin" class="btn btn-sm btn-light text-teal" title="Editar" @click="editItem(item)">
                                             <i class="fas fa-edit"></i>
                                         </button>
+                                        <button v-if="isAdmin" class="btn btn-sm btn-light text-danger ms-1" title="Eliminar Item" @click="deleteItem(item)">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
                                     </td>
                                 </tr>
                                 <tr v-if="items.length === 0">
@@ -219,6 +222,35 @@
         </div>
     </div>
 
+    <!-- PREMIUM DELETE CONFIRMATION MODAL -->
+    <div v-if="itemToDelete" class="modal d-block" style="background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); z-index: 2000;" @click.self="itemToDelete = null">
+        <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
+            <div class="modal-content rounded-4 border-0 shadow-lg animate-up">
+                <div class="modal-body p-4 text-center">
+                    <div class="mb-4">
+                        <div class="bg-danger-subtle text-danger rounded-circle d-inline-flex align-items-center justify-content-center mb-3 shadow-sm" style="width: 70px; height: 70px;">
+                            <i class="fas fa-trash-alt fa-2x"></i>
+                        </div>
+                        <h5 class="fw-bold text-dark">¿Eliminar Insumo?</h5>
+                        <p class="text-muted small px-2">
+                            Estás a punto de eliminar <strong>"{{ itemToDelete.name }}"</strong> del inventario. 
+                            Se borrará también todo su historial de movimientos.
+                        </p>
+                    </div>
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-danger py-2 fw-bold rounded-pill" @click="confirmDeleteItem" :disabled="submitting">
+                            <i v-if="submitting" class="spinner-border spinner-border-sm me-2"></i>
+                            {{ submitting ? 'Eliminando...' : 'Sí, Eliminar Permanentemente' }}
+                        </button>
+                        <button class="btn btn-light py-2 rounded-pill text-muted fw-bold" @click="itemToDelete = null" :disabled="submitting">
+                            Cancelar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
   </div>
 </template>
 
@@ -234,6 +266,7 @@ const submitting = ref(false)
 const showConsumeModal = ref(false)
 const showAdjustModal = ref(false)
 const showAuditModal = ref(false)
+const itemToDelete = ref<any>(null)
 
 // Forms
 const form = reactive({
@@ -466,6 +499,36 @@ const handleAudit = async () => {
 
     } catch (e: any) {
         alert('Error: ' + e.message)
+    } finally {
+        submitting.value = false
+    }
+}
+const deleteItem = (item: any) => {
+    itemToDelete.value = item
+}
+
+const confirmDeleteItem = async () => {
+    if (!itemToDelete.value) return
+    submitting.value = true
+    try {
+        const { error } = await supabase.schema('app_carelink')
+            .from('inventory_items')
+            .delete()
+            .eq('id', itemToDelete.value.id)
+        
+        if (error) {
+            // Check for potential conflict if cascade fix failed
+            if (error.code === '23503') {
+                throw new Error('No se puede eliminar porque existen transacciones vinculadas. Por favor contacta soporte para aplicar el fix de integridad.')
+            }
+            throw error
+        }
+        
+        itemToDelete.value = null
+        await fetchInventory()
+    } catch (e: any) {
+        console.error('Delete Item Error:', e)
+        alert('Error al eliminar: ' + (e.message || e.details || 'Error desconocido'))
     } finally {
         submitting.value = false
     }
