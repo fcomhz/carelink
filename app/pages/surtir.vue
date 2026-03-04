@@ -219,9 +219,9 @@
                                          <button class="btn btn-xs btn-outline-teal py-1" @click="sendPushFollowUp(c)" title="Recordatorio por App">
                                              <i class="fas fa-bell me-1"></i> Aviso App
                                          </button>
-                                         <button v-if="isAdmin" class="btn btn-xs btn-outline-success py-1" @click="markAsFulfilled(c)" title="Marcar como entregado">
-                                             <i class="fas fa-check me-1"></i> Recibido
-                                         </button>
+                                         <div v-if="isAdmin" class="btn btn-xs btn-outline-secondary py-1 text-decoration-none" title="Validar en Entradas" style="cursor:help;">
+                                             <i class="fas fa-boxes me-1"></i> Validar en Almacén
+                                         </div>
                                          <button v-if="isAdmin" class="btn btn-xs btn-outline-danger py-1" @click="openDeleteCommitModal(c)" title="Eliminar Compromiso">
                                              <i class="fas fa-trash me-1"></i> Eliminar
                                          </button>
@@ -608,17 +608,7 @@ const sendPushFollowUp = async (commit: any) => {
     }
 }
 
-const markAsFulfilled = async (commit: any) => {
-    if (!confirm('¿Marcar este compromiso como ENTREGADO?')) return
-    
-    const { error } = await supabase.schema('app_carelink')
-        .from('fulfillments')
-        .update({ status: 'ENTREGADO', received_at: new Date().toISOString(), received_by: profile.value.id })
-        .eq('id', commit.id)
-    
-    if (error) alert('Error: ' + error.message)
-    else await fetchMyCommits()
-}
+
 
 // ACTIONS
 const openSurtirModal = (req: any) => {
