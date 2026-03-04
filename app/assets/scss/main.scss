@@ -132,6 +132,47 @@ body {
     }
 }
 
+// Collapsible Menu Utilities
+.transition-transform {
+    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.menu-collapsed {
+    transform: translateY(100%);
+    
+    // Allow a tiny bit of the top border to be visible if desired, 
+    // but here we completely hide it and rely on the toggle button
+}
+
+.menu-collapsed-padding {
+    padding-bottom: 1rem !important;
+    margin-bottom: 1rem !important;
+    transition: all 0.4s ease;
+}
+
+.menu-toggle-container {
+    z-index: 1040; // Just below the navbar when not collapsed, above it when collapsed
+    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    pointer-events: none; // Allow interaction with elements below if needed
+    
+    .toggle-btn {
+        pointer-events: auto;
+        opacity: 0.9;
+        &:hover {
+            opacity: 1;
+            transform: translateY(-2px);
+        }
+    }
+    
+    &.collapsed {
+        transform: translateY(-10px); // Positioned slightly above the bottom
+    }
+    
+    &:not(.collapsed) {
+        transform: translateY(-80px); // Positioned above the expanded navbar
+    }
+}
+
 // Forms
 .form-control,
 .form-select {

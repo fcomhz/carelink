@@ -1,5 +1,39 @@
 # Progreso del Proyecto CareLink
 
+## 🟢 Sesión: UX Avanzada - Menú Administrador Colapsable (04 Mar 2026 - Mañana)
+
+### 1. 🏗️ Implementación de Menú Colapsable
+- **Problema**: El menú inferior (bottom nav) ocupaba espacio crítico en pantallas con alto zoom, dificultando la interacción con elementos de la interfaz.
+- **Solución**:
+    - Se integró un estado `isMenuCollapsed` persistente mediante `useCookie`.
+    - Se añadió un botón flotante dinámico (`menu-toggle-container`) que permite mostrar/ocultar la navegación.
+    - Se implementaron transiciones suaves en SCSS para la animación de ocultado.
+- **Beneficio**: Los administradores ahora pueden liberar el 100% del área de trabajo cuando lo necesiten, mejorando la usabilidad en dispositivos diversos.
+
+---
+
+## 🟢 Sesión: Corrección de Cache y Blindaje de Recepción (03 Mar 2026 - Noche)
+
+### 1. ⚡ Resolución de Error "Schema Cache"
+- **Diagnóstico**: Se identificó un error persistente (`Could not find the 'received_at' column`) causado por una desincronización entre la base de datos y la caché de PostgREST en Supabase tras migraciones recientes.
+- **Solución SQL**: Se creó y ejecutó el script `FIX_SCHEMA_CACHE_RECEIVED_AT.sql` que:
+    - Asegura la existencia de las columnas `received_at`, `received_by`, `financial_value`, `user_id` y `delivery_date` en la tabla `fulfillments`.
+    - Refuerza las políticas RLS para entorno multi-tenant.
+    - Ejecuta un comando `NOTIFY pgrst, 'reload schema'` para forzar la actualización inmediata de la caché de Supabase sin reiniciar el servicio.
+
+### 2. 🛡️ Blindaje del Flujo de Recepción (Opción A)
+- **Centralización en Almacén**: Se decidió inhabilitar la recepción directa desde el módulo de "Surtir" para garantizar que todo lo recibido pase por un proceso de conteo y valoración formal.
+- **Modificaciones en `surtir.vue`**: 
+    - Se eliminó el botón **"Recibido"** y su lógica asociada (`markAsFulfilled`).
+    - Se añadió un indicador visual ("Validar en Almacén") que guía al administrador hacia el módulo de **Entradas** para completar el proceso.
+- **Beneficio**: Ahora cada pedido recibido genera obligatoriamente un ingreso al Inventario y (opcionalmente) un registro en el Balance Financiero, evitando "fugas" de información logística.
+
+### 3. 🚀 Despliegue y Git
+- **Producción**: Todos los cambios fueron desplegados a Vercel (`vercel --prod`) y están operativos.
+- **Repositorio**: Cambios sincronizados en GitHub con el commit `fix: Eliminar botón Recibido de surtir y forzar flujo en almacén`.
+
+---
+
 ## 🟢 Sesión: UX Premium, Integridad de Datos y Gestión de Inventario (24 Feb 2026 - Tarde)
 
 ### 1. 🎨 UX Premium (Modales de Confirmación)

@@ -1,5 +1,5 @@
 <template>
-    <div class="pb-5 mb-5">
+    <div class="pb-5 mb-5" :class="{ 'menu-collapsed-padding': isMenuCollapsed }">
         <!-- TOP NAVBAR (Premium Gradient) -->
         <nav class="navbar text-white shadow-sm sticky-top px-3 pb-2 pt-2" style="background: var(--teal-gradient);">
             <div class="d-flex align-items-center">
@@ -39,7 +39,14 @@
         </main>
 
         <!-- BOTTOM NAV (Glassmorphism + Role Based) -->
-        <nav class="navbar fixed-bottom glass-nav py-1 shadow-lg">
+        <div v-if="isAdmin" class="menu-toggle-container fixed-bottom d-flex justify-content-center" :class="{ 'collapsed': isMenuCollapsed }">
+            <button class="btn btn-teal btn-sm rounded-pill shadow-sm px-3 py-1 mb-2 toggle-btn" @click="isMenuCollapsed = !isMenuCollapsed">
+                <i class="fas" :class="isMenuCollapsed ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+                <span class="ms-2 x-small fw-bold">{{ isMenuCollapsed ? 'Mostrar Menú' : 'Contraer' }}</span>
+            </button>
+        </div>
+
+        <nav class="navbar fixed-bottom glass-nav py-1 shadow-lg transition-transform" :class="{ 'menu-collapsed': isMenuCollapsed }">
             <div class="container-fluid d-flex justify-content-around align-items-center px-1">
                 <NuxtLink v-if="isAdmin || isPatrocinador" to="/" class="nav-btn text-center text-decoration-none" active-class="active">
                     <div class="nav-icon-container"><i class="fas fa-house-user"></i></div>
@@ -84,6 +91,8 @@ const router = useRouter()
 const isAdmin = computed(() => profile.value?.role === 'ADMIN')
 const isAsistente = computed(() => ['ASISTENTE', 'ENFERMERO'].includes(profile.value?.role))
 const isPatrocinador = computed(() => profile.value?.role === 'APORTADOR')
+
+const isMenuCollapsed = useCookie('admin_menu_collapsed', { default: () => false })
 
 
 const logout = async () => {
